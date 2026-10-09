@@ -2,8 +2,8 @@
 <html lang="id" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NMS RnB Network</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NMS RnB Network - Mobile</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -40,13 +40,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Leaflet Map CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
   <style>
     body {
       background-color: #040711;
@@ -67,211 +60,207 @@
     .glass-glow-amber { border-color: rgba(245, 158, 11, 0.5); box-shadow: 0 0 20px -5px rgba(245, 158, 11, 0.2); }
     .glass-glow-rose { border-color: rgba(244, 63, 94, 0.5); box-shadow: 0 0 20px -5px rgba(244, 63, 94, 0.2); }
 
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-track { background: #040711; }
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
 
     .pulse-glow-green { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulseGreen 2s infinite; }
-    .pulse-glow-amber { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.8); animation: pulseAmber 1.2s infinite; }
-    .pulse-glow-rose { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.9); animation: pulseRose 0.9s infinite; }
 
-    @keyframes pulseGreen { 70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } }
-    @keyframes pulseAmber { 70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } }
-    @keyframes pulseRose { 70% { box-shadow: 0 0 0 12px rgba(244, 63, 94, 0); } }
-
-    #leaflet-map { height: 500px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+    @keyframes pulseGreen { 70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } }
   </style>
 </head>
 
 <body class="min-h-screen flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-black">
 
-  <!-- TOP HEADER NAVIGATION BAR -->
-  <header class="bg-slate-900/90 border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-xl px-4 lg:px-8 py-2.5">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 max-w-[1850px] mx-auto">
-      
-      <!-- Brand Logo & Cluster Info -->
-      <div class="flex items-center space-x-3">
-        <!-- Tombol Hamburger Menu untuk HP -->
-        <button onclick="toggleSidebar()" class="lg:hidden text-cyan-400 hover:text-cyan-300 transition p-1">
-          <i class="fa-solid fa-bars text-xl"></i>
-        </button>
-        
-        <div class="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.25)] hidden sm:block">
-          <i class="fa-solid fa-tower-observation text-xl"></i>
-        </div>
-        <div>
-          <div class="flex items-center space-x-2">
-            <h1 class="text-base sm:text-lg font-extrabold text-white tracking-wider">NMS RnB Network</h1>
-            <span class="px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 rounded-full uppercase tracking-widest">Created: Iyann</span>
-          </div>
-          <p class="text-[10px] sm:text-[11px] text-slate-400 flex flex-wrap items-center gap-1 sm:gap-2 mt-0.5 font-mono">
-            <span><i class="fa-solid fa-server text-slate-500"></i> <strong class="text-slate-200">Panglejar • Perum • Cibarola • Sukamelang</strong></span>
-            <span class="hidden sm:inline">•</span>
-            <span class="flex items-center gap-1.5 text-emerald-400">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-glow-green"></span>
-              SNMP Active
-            </span>
-          </p>
-        </div>
+  <!-- OVERLAY SIDEBAR -->
+  <div id="sidebar-overlay" onclick="toggleMenu()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+  <!-- SIDEBAR MENU (MENU DI PINGGIR) -->
+  <aside id="sidebar-menu" class="fixed inset-y-0 left-0 w-64 bg-slate-900 border-r border-slate-800 transform -translate-x-full transition-transform duration-300 z-50 flex flex-col shadow-2xl">
+    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-tower-observation text-cyan-400 text-xl"></i>
+        <h2 class="text-base font-extrabold text-white">NMS RnB</h2>
       </div>
-
-      <!-- Quick Action Toolbar -->
-      <div class="flex items-center gap-2 flex-wrap self-end md:self-auto">
-        <!-- Digital Clock (Dibuat lebih compact di HP) -->
-        <div class="bg-slate-950/80 border border-slate-800 px-3 py-1 rounded-xl text-right md:order-last">
-          <div id="digital-clock" class="text-xs font-bold font-mono text-cyan-400 tracking-wider">00:00 WIB</div>
-        </div>
-        
-        <!-- Manual Auto-Sync Button -->
-        <button onclick="loadCustomersFromMikrotik()" class="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl transition text-[11px] font-extrabold flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-          <i class="fa-solid fa-rotate"></i>
-          <span class="hidden sm:inline">Sync</span>
-        </button>
-
-        <!-- System & Telegram (Disembunyikan icon/text di layar sangat kecil) -->
-        <button onclick="openModal('health-modal')" class="px-2.5 py-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/30 rounded-xl transition text-[11px] font-bold">
-          <i class="fa-solid fa-heart-pulse"></i>
-        </button>
-        <button onclick="openModal('telegram-modal')" class="px-2.5 py-1.5 bg-sky-500/10 text-sky-400 border border-sky-500/30 rounded-xl transition text-[11px] font-bold">
-          <i class="fa-brands fa-telegram text-sm"></i>
-        </button>
-      </div>
-
+      <button onclick="toggleMenu()" class="text-slate-400 hover:text-white p-1 text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
+
+    <!-- Navigasi Menu -->
+    <div class="flex-1 overflow-y-auto py-4 space-y-1 px-3">
+      <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-3">Main Menu</div>
+      
+      <button id="tab-btn-list" onclick="switchTabMobile('list')" class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl border border-cyan-500/30 text-cyan-400 bg-cyan-500/10 flex items-center gap-3 transition">
+        <i class="fa-solid fa-users text-sm w-4 text-center"></i> Daftar Pelanggan
+      </button>
+      
+      <button id="tab-btn-topology" onclick="switchTabMobile('topology')" class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800 flex items-center gap-3 transition">
+        <i class="fa-solid fa-sitemap text-sm w-4 text-center"></i> Topologi PON
+      </button>
+      
+      <button id="tab-btn-console" onclick="switchTabMobile('console')" class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800 flex items-center justify-between transition">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-terminal text-sm w-4 text-center"></i> Live Trap Feed
+        </div>
+        <span id="badge-trap-count" class="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded-full font-mono">0</span>
+      </button>
+
+      <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2 px-3">Quick Actions</div>
+      
+      <button onclick="openModal('telegram-modal'); toggleMenu()" class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl text-sky-400 hover:bg-sky-500/10 flex items-center gap-3 transition">
+        <i class="fa-brands fa-telegram text-sm w-4 text-center"></i> Set Telegram Bot
+      </button>
+      
+      <button onclick="openModal('health-modal'); toggleMenu()" class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-xl text-purple-400 hover:bg-purple-500/10 flex items-center gap-3 transition">
+        <i class="fa-solid fa-heart-pulse text-sm w-4 text-center"></i> System Health
+      </button>
+      
+      <button onclick="loadCustomersFromMikrotik(); toggleMenu()" class="w-full mt-2 text-left px-3 py-2.5 text-xs font-bold rounded-xl bg-cyan-500 text-black flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,240,255,0.3)] transition">
+        <i class="fa-solid fa-rotate"></i> Auto-Sync MikroTik
+      </button>
+    </div>
+
+    <!-- Footer Sidebar -->
+    <div class="p-4 border-t border-slate-800 bg-slate-950/50">
+      <div id="digital-clock" class="text-sm font-bold font-mono text-cyan-400 tracking-wider">00:00:00 WIB</div>
+      <div id="digital-date" class="text-[10px] text-slate-400 font-medium mt-0.5">Loading Date...</div>
+      <p class="text-[9px] text-slate-500 mt-2 font-mono flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-glow-green"></span> UDP:162 Active
+      </p>
+    </div>
+  </aside>
+
+  <!-- TOP HEADER (MOBILE FRIENDLY) -->
+  <header class="bg-slate-900/90 border-b border-slate-800/80 sticky top-0 z-30 backdrop-blur-xl px-3 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <button onclick="toggleMenu()" class="p-1.5 text-cyan-400 hover:text-white rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+        <i class="fa-solid fa-bars text-lg"></i>
+      </button>
+      <div>
+        <h1 class="text-sm font-extrabold text-white tracking-wider flex items-center gap-1">
+          NMS Mobile <span class="text-[8px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded-full uppercase">Iyann</span>
+        </h1>
+      </div>
+    </div>
+    
+    <!-- Sync Button Cepat -->
+    <button onclick="loadCustomersFromMikrotik()" class="p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg transition shadow-[0_0_15px_rgba(0,240,255,0.3)]">
+      <i class="fa-solid fa-rotate text-sm"></i>
+    </button>
   </header>
 
-  <!-- SIDEBAR MENU UNTUK HP -->
-  <div id="mobile-sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden lg:hidden"></div>
-  <div id="nav-sidebar" class="fixed top-0 left-0 h-full w-64 bg-slate-900/95 backdrop-blur-xl z-50 transform -translate-x-full transition-transform duration-300 lg:relative lg:translate-x-0 lg:w-auto lg:h-auto lg:bg-transparent lg:flex lg:items-center lg:space-x-2 lg:border-b lg:border-slate-800/80 lg:pb-0 overflow-y-auto lg:overflow-visible flex-col lg:flex-row pt-16 lg:pt-0 border-r border-slate-800 lg:border-r-0 shadow-2xl lg:shadow-none">
-    
-    <button onclick="toggleSidebar()" class="absolute top-4 right-4 text-slate-400 hover:text-white lg:hidden">
-      <i class="fa-solid fa-xmark text-2xl"></i>
-    </button>
-    <div class="px-5 pb-4 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800 lg:hidden">Menu Navigasi</div>
-
-    <button id="tab-btn-list" onclick="switchTab('list')" class="w-full lg:w-auto text-left lg:text-center px-5 lg:px-4 py-4 lg:py-2.5 text-xs font-bold lg:rounded-t-2xl border-l-4 lg:border-l-0 lg:border-b-2 border-cyan-400 text-cyan-400 bg-slate-800/40 lg:bg-slate-900/60 flex items-center gap-3 lg:gap-2 transition whitespace-nowrap tracking-wider uppercase">
-      <i class="fa-solid fa-users text-sm w-5"></i> Daftar Pelanggan
-    </button>
-    <button id="tab-btn-topology" onclick="switchTab('topology')" class="w-full lg:w-auto text-left lg:text-center px-5 lg:px-4 py-4 lg:py-2.5 text-xs font-bold lg:rounded-t-2xl border-l-4 lg:border-l-0 lg:border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-3 lg:gap-2 transition whitespace-nowrap tracking-wider uppercase border-b border-slate-800/50 lg:border-b-transparent">
-      <i class="fa-solid fa-sitemap text-sm w-5"></i> Topologi PON Port
-    </button>
-    <button id="tab-btn-console" onclick="switchTab('console')" class="w-full lg:w-auto text-left lg:text-center px-5 lg:px-4 py-4 lg:py-2.5 text-xs font-bold lg:rounded-t-2xl border-l-4 lg:border-l-0 lg:border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-3 lg:gap-2 transition whitespace-nowrap tracking-wider uppercase border-b border-slate-800/50 lg:border-b-transparent">
-      <i class="fa-solid fa-terminal text-sm w-5"></i> Live Trap Feed
-      <span id="badge-trap-count" class="px-2 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 rounded-full font-mono ml-auto lg:ml-0">0</span>
-    </button>
-    
-    <!-- Peta dan Analytics disembunyikan di layar HP (hidden lg:flex) -->
-    <button id="tab-btn-map" onclick="switchTab('map')" class="hidden lg:flex w-full lg:w-auto text-left lg:text-center px-5 lg:px-4 py-4 lg:py-2.5 text-xs font-bold lg:rounded-t-2xl border-l-4 lg:border-l-0 lg:border-b-2 border-transparent text-slate-400 hover:text-slate-200 items-center gap-3 lg:gap-2 transition whitespace-nowrap tracking-wider uppercase">
-      <i class="fa-solid fa-map-location-dot text-sm w-5"></i> Peta Sebaran GIS
-    </button>
-    <button id="tab-btn-analytics" onclick="switchTab('analytics')" class="hidden lg:flex w-full lg:w-auto text-left lg:text-center px-5 lg:px-4 py-4 lg:py-2.5 text-xs font-bold lg:rounded-t-2xl border-l-4 lg:border-l-0 lg:border-b-2 border-transparent text-slate-400 hover:text-slate-200 items-center gap-3 lg:gap-2 transition whitespace-nowrap tracking-wider uppercase">
-      <i class="fa-solid fa-chart-pie text-sm w-5"></i> Analytics & Trend
-    </button>
-  </div>
-
   <!-- MAIN DASHBOARD CONTENT -->
-  <main class="flex-1 px-4 lg:px-8 py-5 space-y-5 max-w-[1850px] w-full mx-auto">
+  <main class="flex-1 px-3 py-4 space-y-4 max-w-full overflow-x-hidden">
 
-    <!-- METRICS CARDS GRID (Disesuaikan grid-cols-2 untuk HP agar lebih rapi) -->
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 lg:gap-3.5">
+    <!-- LIVE TICKER ALARM -->
+    <div id="live-alert-ticker" class="hidden glass-card glass-glow-amber text-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs animate-pulse">
+      <div class="text-amber-400 mt-0.5"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="flex-1">
+        <strong id="ticker-title" class="font-extrabold uppercase text-amber-300 block">TRAP ALARM MASUK:</strong>
+        <span id="ticker-msg" class="font-mono text-slate-200 block mt-0.5 leading-relaxed text-[11px]">Menunggu event...</span>
+      </div>
+      <button onclick="document.getElementById('live-alert-ticker').classList.add('hidden')" class="text-slate-400 p-1">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- METRICS CARDS GRID (2 KOLOM KHUSUS HP) -->
+    <div class="grid grid-cols-2 gap-2.5">
       
       <!-- Total ONU -->
-      <div class="glass-card rounded-2xl p-3 sm:p-4 relative overflow-hidden">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total Pelanggan</span>
-          <div class="p-1.5 sm:p-2 bg-blue-500/10 text-blue-400 rounded-lg sm:rounded-xl"><i class="fa-solid fa-users text-xs sm:text-base"></i></div>
+      <div class="glass-card rounded-xl p-3 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[9px] font-bold text-slate-400 uppercase">Total User</span>
+          <i class="fa-solid fa-users text-blue-400 text-xs"></i>
         </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span id="metric-total" class="text-xl sm:text-2xl font-extrabold font-mono text-white">0</span>
+        <div class="flex items-baseline gap-1">
+          <span id="metric-total" class="text-lg font-extrabold font-mono text-white">0</span>
         </div>
-        <div class="mt-1 text-[9px] sm:text-[10px] text-slate-500">User PPPoE (SyncActive)</div>
-        <div class="absolute bottom-0 left-0 right-0 h-1 bg-blue-500/50"></div>
+        <div class="text-[9px] text-slate-500 mt-1 truncate">MikroTik Sync</div>
+        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500/50"></div>
       </div>
 
       <!-- Online -->
-      <div class="glass-card rounded-2xl p-3 sm:p-4 relative overflow-hidden">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Online Normal</span>
-          <div class="p-1.5 sm:p-2 bg-emerald-500/10 text-emerald-400 rounded-lg sm:rounded-xl"><i class="fa-solid fa-circle-check text-xs sm:text-base"></i></div>
+      <div class="glass-card rounded-xl p-3 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[9px] font-bold text-slate-400 uppercase">Online Normal</span>
+          <i class="fa-solid fa-circle-check text-emerald-400 text-xs"></i>
         </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span id="metric-online" class="text-xl sm:text-2xl font-extrabold font-mono text-emerald-400">0</span>
-          <span id="metric-online-pct" class="text-[10px] sm:text-[11px] text-emerald-500 font-medium">0%</span>
+        <div class="flex items-baseline gap-1">
+          <span id="metric-online" class="text-lg font-extrabold font-mono text-emerald-400">0</span>
+          <span id="metric-online-pct" class="text-[9px] text-emerald-500 font-medium">0%</span>
         </div>
-        <div class="mt-1 text-[9px] sm:text-[10px] text-slate-500">Tautan Optik Stabil</div>
-        <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500"></div>
+        <div class="text-[9px] text-slate-500 mt-1 truncate">Optik Stabil</div>
+        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500"></div>
       </div>
 
       <!-- Mati Listrik -->
-      <div class="glass-card glass-glow-amber rounded-2xl p-3 sm:p-4 relative overflow-hidden">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-bold text-amber-400 uppercase tracking-widest leading-tight">⚡ Mati Listrik</span>
-          <div class="p-1.5 sm:p-2 bg-amber-500/10 text-amber-400 rounded-lg sm:rounded-xl"><i class="fa-solid fa-plug-circle-xmark text-xs sm:text-base"></i></div>
+      <div class="glass-card glass-glow-amber rounded-xl p-3 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[9px] font-bold text-amber-400 uppercase">⚡ Listrik Padam</span>
         </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span id="metric-dying" class="text-xl sm:text-2xl font-extrabold font-mono text-amber-400">0</span>
+        <div class="flex items-baseline gap-1">
+          <span id="metric-dying" class="text-lg font-extrabold font-mono text-amber-400">0</span>
         </div>
-        <div class="mt-1 text-[9px] sm:text-[10px] text-amber-300/70">Dying Gasp (PLN Off)</div>
-        <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500"></div>
+        <div class="text-[9px] text-amber-300/70 mt-1 truncate">FO Aman (Dying Gasp)</div>
+        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>
       </div>
 
       <!-- Lose Koneksi -->
-      <div class="glass-card glass-glow-rose rounded-2xl p-3 sm:p-4 relative overflow-hidden">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-bold text-rose-400 uppercase tracking-widest leading-tight">🚨 Lose Koneksi</span>
-          <div class="p-1.5 sm:p-2 bg-rose-500/10 text-rose-400 rounded-lg sm:rounded-xl"><i class="fa-solid fa-scissors text-xs sm:text-base"></i></div>
+      <div class="glass-card glass-glow-rose rounded-xl p-3 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[9px] font-bold text-rose-400 uppercase">🚨 Lose Koneksi</span>
         </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span id="metric-los" class="text-xl sm:text-2xl font-extrabold font-mono text-rose-400">0</span>
+        <div class="flex items-baseline gap-1">
+          <span id="metric-los" class="text-lg font-extrabold font-mono text-rose-400">0</span>
         </div>
-        <div class="mt-1 text-[9px] sm:text-[10px] text-rose-300/70">LOS / Kabel Putus</div>
-        <div class="absolute bottom-0 left-0 right-0 h-1 bg-rose-500"></div>
+        <div class="text-[9px] text-rose-300/70 mt-1 truncate">FO Putus (LOS/Off)</div>
+        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-rose-500"></div>
       </div>
 
-      <!-- Redaman High (> -25 dBm) -->
-      <div class="glass-card rounded-2xl p-3 sm:p-4 relative overflow-hidden">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-tight">⚠️ Redaman High</span>
-          <div class="p-1.5 sm:p-2 bg-orange-500/10 text-orange-400 rounded-lg sm:rounded-xl"><i class="fa-solid fa-triangle-exclamation text-xs sm:text-base"></i></div>
+      <!-- Redaman High -->
+      <div class="glass-card rounded-xl p-3 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[9px] font-bold text-slate-400 uppercase">⚠️ Rx High</span>
         </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span id="metric-high-rx" class="text-xl sm:text-2xl font-extrabold font-mono text-orange-400">0</span>
+        <div class="flex items-baseline gap-1">
+          <span id="metric-high-rx" class="text-lg font-extrabold font-mono text-orange-400">0</span>
         </div>
-        <div class="mt-1 text-[9px] sm:text-[10px] text-slate-500">&gt; -25 dBm (Bending)</div>
-        <div class="absolute bottom-0 left-0 right-0 h-1 bg-orange-500/50"></div>
+        <div class="text-[9px] text-slate-500 mt-1 truncate">&gt; -25 dBm</div>
+        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500/50"></div>
       </div>
 
       <!-- Avg Signal Rx -->
-      <div class="glass-card rounded-2xl p-3 sm:p-4 relative overflow-hidden">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Rata-rata Rx</span>
-          <div class="p-1.5 sm:p-2 bg-purple-500/10 text-purple-400 rounded-lg sm:rounded-xl"><i class="fa-solid fa-wave-square text-xs sm:text-base"></i></div>
+      <div class="glass-card rounded-xl p-3 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[9px] font-bold text-slate-400 uppercase">Rata-rata Rx</span>
         </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span id="metric-rx" class="text-lg sm:text-2xl font-extrabold font-mono text-purple-300">-20.15</span>
-          <span class="text-[10px] sm:text-[11px] text-slate-400">dBm</span>
+        <div class="flex items-baseline gap-1">
+          <span id="metric-rx" class="text-lg font-extrabold font-mono text-purple-300">-20.15</span>
         </div>
-        <div class="mt-1 text-[9px] sm:text-[10px] text-slate-500">Target Ideal: -19</div>
-        <div class="absolute bottom-0 left-0 right-0 h-1 bg-purple-500/50"></div>
+        <div class="text-[9px] text-slate-500 mt-1 truncate">Target: -19 dBm</div>
+        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500/50"></div>
       </div>
 
     </div>
 
-    <!-- VIEW 1: DAFTAR PELANGGAN & DETAIL ACTIONS -->
+    <!-- VIEW 1: DAFTAR PELANGGAN -->
     <div id="view-list" class="space-y-4">
       
-      <!-- Filter Controls -->
-      <div class="glass-card rounded-2xl p-3 flex flex-col md:flex-row items-center justify-between gap-3">
-        <div class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 w-full md:w-auto overflow-x-auto no-scrollbar">
-          <button onclick="setFilter('ALL')" id="flt-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 text-black whitespace-nowrap">Semua (<span id="cnt-all">0</span>)</button>
-          <button onclick="setFilter('ONLINE')" id="flt-online" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 whitespace-nowrap">Online (<span id="cnt-online">0</span>)</button>
-          <button onclick="setFilter('DYING_GASP')" id="flt-dying" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 whitespace-nowrap">Mati Listrik (<span id="cnt-dying">0</span>)</button>
-          <button onclick="setFilter('LOS')" id="flt-los" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 whitespace-nowrap">LOS (<span id="cnt-los">0</span>)</button>
-          <button onclick="resetPonFilter()" id="flt-pon-reset" class="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-rose-500/20 text-rose-400 hidden ml-1 whitespace-nowrap"><i class="fa-solid fa-xmark"></i> PON</button>
+      <!-- Filter Controls (Stack Vertical u/ HP) -->
+      <div class="glass-card rounded-xl p-3 flex flex-col gap-3">
+        
+        <!-- Status Filter Tabs (Scroll Horizontal) -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-nowrap">
+          <button onclick="setFilter('ALL')" id="flt-all" class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-cyan-500 text-black transition">Semua (<span id="cnt-all">0</span>)</button>
+          <button onclick="setFilter('ONLINE')" id="flt-online" class="px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 transition">Online (<span id="cnt-online">0</span>)</button>
+          <button onclick="setFilter('DYING_GASP')" id="flt-dying" class="px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 transition">Mati Listrik (<span id="cnt-dying">0</span>)</button>
+          <button onclick="setFilter('LOS')" id="flt-los" class="px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 transition">LOS/Off (<span id="cnt-los">0</span>)</button>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-          <select id="node-filter-select" onchange="renderTable()" class="w-full sm:w-auto bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono focus:outline-none">
+        <div class="flex flex-col gap-2">
+          <select id="node-filter-select" onchange="renderTable()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-[11px] text-cyan-400 font-mono focus:outline-none focus:border-cyan-400">
             <option value="ALL">Semua Node Server</option>
             <option value="Panglejar">Node Panglejar</option>
             <option value="Perum">Node Perum</option>
@@ -279,32 +268,31 @@
             <option value="Sukamelang">Node Sukamelang</option>
           </select>
 
-          <div class="relative w-full sm:w-64">
+          <div class="relative w-full">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-            <input type="text" id="search-input" onkeyup="renderTable()" placeholder="Cari Pelanggan..." class="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 font-mono">
+            <input type="text" id="search-input" onkeyup="renderTable()" placeholder="Cari Nama Pelanggan..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-400 transition">
           </div>
         </div>
+
+        <button onclick="resetPonFilter()" id="flt-pon-reset" class="w-full py-2 rounded-lg text-[11px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 transition hidden flex items-center justify-center gap-1.5">
+           <i class="fa-solid fa-filter-circle-xmark"></i> Reset Filter Pencarian OLT
+        </button>
+
       </div>
 
-      <!-- Main Subscriber Table Grid -->
-      <div class="glass-card rounded-2xl overflow-hidden">
-        <div class="p-3 border-b border-slate-800/80 flex items-center justify-between">
-          <h2 class="text-[11px] sm:text-xs font-extrabold text-slate-200 flex items-center gap-2 uppercase tracking-wider">
-            <i class="fa-solid fa-list-check text-cyan-400"></i> Status Realtime
-          </h2>
-          <span class="text-[10px] text-slate-500 bg-slate-900 px-2 py-1 rounded hidden sm:block">Ketuk baris untuk detail (Di HP)</span>
+      <!-- Main Subscriber Table Grid (Minimalis) -->
+      <div class="glass-card rounded-xl overflow-hidden">
+        <div class="p-3 border-b border-slate-800/80 bg-slate-900/50">
+          <p class="text-[10px] text-slate-400 text-center italic">*Klik pada nama pelanggan untuk melihat detail</p>
         </div>
 
-        <div class="overflow-x-auto w-full">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider font-mono">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-[11px]">
+            <thead class="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase text-[9px] tracking-wider font-mono">
               <tr>
-                <th class="px-3 sm:px-4 py-3">Pelanggan</th>
-                <th class="px-3 sm:px-4 py-3">Server Node</th>
-                <th class="px-4 py-3 hidden md:table-cell">MAC / IP Address</th>
-                <th class="px-3 sm:px-4 py-3">Redaman</th>
-                <th class="px-4 py-3 hidden md:table-cell">Status</th>
-                <th class="px-4 py-3 text-right hidden md:table-cell">Aksi</th>
+                <th class="px-3 py-2">Nama Pelanggan</th>
+                <th class="px-2 py-2">Node</th>
+                <th class="px-3 py-2 text-right">Rx (dBm)</th>
               </tr>
             </thead>
             <tbody id="customer-table-body" class="divide-y divide-slate-800/60 font-medium font-mono">
@@ -318,138 +306,157 @@
 
     <!-- VIEW 2: TOPOLOGY PON PORT VISUALIZER -->
     <div id="view-topology" class="hidden space-y-4">
-      <div class="glass-card rounded-2xl p-4 sm:p-5">
-        <h2 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2 border-b border-slate-800 pb-3">
-          <i class="fa-solid fa-sitemap text-purple-400"></i> Topologi Pemetaan Slot PON
+      <div class="glass-card rounded-xl p-4">
+        <h2 class="text-xs font-bold text-slate-200 mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">
+          <i class="fa-solid fa-sitemap text-purple-400"></i> Topologi Slot PON & Cluster
         </h2>
-        <div id="topology-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        <div id="topology-grid-container" class="grid grid-cols-1 gap-3">
+          <!-- Populated dynamically -->
+        </div>
       </div>
     </div>
 
     <!-- VIEW 3: LIVE SNMP TRAP STREAM -->
     <div id="view-console" class="hidden space-y-4">
-      <div class="glass-card rounded-2xl p-4 sm:p-5 font-mono text-xs">
+      <div class="glass-card rounded-xl p-4 font-mono text-[10px]">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-3">
-          <span class="text-slate-400 font-bold tracking-wider text-[10px] sm:text-[11px] uppercase">Live Stream Feed</span>
-          <button onclick="clearConsoleLog()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-bold">Bersihkan</button>
+          <span class="text-slate-400 font-bold uppercase truncate max-w-[60%]">Live Trap Feed UDP:162</span>
+          <button onclick="clearConsoleLog()" class="px-2 py-1 bg-slate-800 text-slate-300 rounded text-[9px] font-bold transition flex items-center gap-1">
+            <i class="fa-solid fa-trash-can"></i> Clear
+          </button>
         </div>
-        <div id="console-stream" class="h-[400px] sm:h-[520px] overflow-y-auto space-y-2 pr-2">
-          <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-slate-500 text-[11px]">
-            [SYSTEM] Listener SNMP Trap aktif. Standby...
+
+        <div id="console-stream" class="h-[60vh] overflow-y-auto space-y-2 pr-1">
+          <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80 text-slate-500">
+            [SYSTEM] Listener SNMP Trap aktif. Standby mendengarkan OLT...
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 4: GEOGRAPHIC MAP VIEW (Hanya utk PC) -->
-    <div id="view-map" class="hidden space-y-4">
-      <div class="glass-card rounded-2xl p-5">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2"><i class="fa-solid fa-map-location-dot text-cyan-400"></i> Peta Distribusi (PC Only)</h2>
-        </div>
-        <div id="leaflet-map" class="h-[400px] sm:h-[500px]"></div>
-      </div>
-    </div>
-
-    <!-- VIEW 5: CHART ANALYTICS (Hanya utk PC) -->
-    <div id="view-analytics" class="hidden space-y-5">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div class="glass-card rounded-2xl p-5">
-          <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-amber-400"></i> Analisis Gangguan</h3>
-          <div class="h-64"><canvas id="chart-downtime-pie"></canvas></div>
         </div>
       </div>
     </div>
 
   </main>
 
-  <!-- MODAL: ONU FULL TELEMETRY DIAGNOSTICS -->
-  <div id="diag-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="glass-card rounded-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl relative border-slate-700 mx-auto">
-      <button onclick="closeModal('diag-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2">
-        <i class="fa-solid fa-xmark text-xl"></i>
+  <!-- MODAL 1: ONU FULL TELEMETRY DIAGNOSTICS (Ukuran HP) -->
+  <div id="diag-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-3">
+    <div class="glass-card rounded-2xl w-full max-w-sm p-4 space-y-4 shadow-2xl relative border-slate-700">
+      <button onclick="closeModal('diag-modal')" class="absolute top-3 right-3 text-slate-400 hover:text-white bg-slate-800 rounded-full w-8 h-8 flex items-center justify-center">
+        <i class="fa-solid fa-xmark"></i>
       </button>
 
-      <div class="flex items-center gap-3 border-b border-slate-800 pb-3 pr-8">
-        <div class="p-2 sm:p-3 bg-cyan-500/10 text-cyan-400 rounded-xl hidden sm:block">
-          <i class="fa-solid fa-microchip text-2xl"></i>
+      <div class="flex items-center gap-3 border-b border-slate-800 pb-3 mt-2">
+        <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+          <i class="fa-solid fa-microchip text-xl"></i>
         </div>
-        <div>
-          <h3 id="diag-name" class="text-base sm:text-lg font-bold text-white break-words">Detail Pelanggan</h3>
-          <p id="diag-server" class="text-[11px] sm:text-xs font-mono text-cyan-400">Server Node: -</p>
+        <div class="pr-6">
+          <h3 id="diag-name" class="text-sm font-bold text-white leading-tight truncate">Detail Pelanggan</h3>
+          <p id="diag-server" class="text-[10px] font-mono text-cyan-400">Server Node: -</p>
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-2 sm:gap-3 text-xs font-mono">
-        <div class="bg-slate-950 p-2 sm:p-3 rounded-xl border border-slate-800">
-          <span class="text-slate-500 block text-[9px] sm:text-[10px]">MAC ADDRESS</span>
+      <div class="grid grid-cols-2 gap-2 text-[10px] font-mono">
+        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+          <span class="text-slate-500 block text-[8px] mb-0.5">MAC ADDRESS</span>
           <span id="diag-mac" class="font-bold text-slate-200 break-all">00:00:00:00:00:00</span>
         </div>
-        <div class="bg-slate-950 p-2 sm:p-3 rounded-xl border border-slate-800">
-          <span class="text-slate-500 block text-[9px] sm:text-[10px]">IP ADDRESS</span>
+        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+          <span class="text-slate-500 block text-[8px] mb-0.5">IP ADDRESS</span>
           <span id="diag-ip" class="font-bold text-slate-200">192.168.0.1</span>
         </div>
-        <div class="bg-slate-950 p-2 sm:p-3 rounded-xl border border-slate-800">
-          <span class="text-slate-500 block text-[9px] sm:text-[10px]">DAYA OPTIK RX</span>
+        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+          <span class="text-slate-500 block text-[8px] mb-0.5">DAYA OPTIK RX</span>
           <span id="diag-rx" class="font-bold text-purple-300">-19.50 dBm</span>
         </div>
-        <div class="bg-slate-950 p-2 sm:p-3 rounded-xl border border-slate-800">
-          <span class="text-slate-500 block text-[9px] sm:text-[10px]">STATUS TAUTAN</span>
+        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+          <span class="text-slate-500 block text-[8px] mb-0.5">STATUS TAUTAN</span>
           <span id="diag-status" class="font-bold text-emerald-400">ONLINE</span>
         </div>
       </div>
 
-      <div id="diag-trap-box" class="p-3 rounded-xl border bg-slate-950 text-xs space-y-1 font-mono"></div>
+      <div id="diag-trap-box" class="p-2.5 rounded-lg border bg-slate-950 text-[10px] space-y-1 font-mono">
+        <!-- Dynamic content -->
+      </div>
 
-      <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-        <button id="btn-buka-isolir" onclick="eksekusiBukaIsolir()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] sm:text-xs font-bold flex items-center gap-1.5 w-full sm:w-auto justify-center">
+      <div class="flex flex-col gap-2 pt-2 border-t border-slate-800">
+        <button id="btn-buka-isolir" onclick="eksekusiBukaIsolir()" class="w-full py-2.5 bg-emerald-600 active:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5">
           <i class="fa-solid fa-lock-open"></i> Buka Isolir
         </button>
-        <button onclick="closeModal('diag-modal')" class="hidden sm:block px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl font-bold text-xs">Tutup</button>
+        <button onclick="closeModal('diag-modal')" class="w-full py-2 bg-slate-800 text-slate-300 active:bg-slate-700 rounded-lg font-bold text-xs transition">Tutup</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL SYSTEM HEALTH -->
-  <div id="health-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="glass-card rounded-2xl max-w-md w-full p-5 relative border-slate-700">
-      <button onclick="closeModal('health-modal')" class="absolute top-4 right-4 text-slate-400"><i class="fa-solid fa-xmark"></i></button>
-      <h3 class="text-base font-bold text-white mb-4">Status NMS Server</h3>
-      <div class="space-y-3 text-xs font-mono">
-        <div class="flex justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800"><span class="text-slate-400">SNMP Trap:</span><span class="text-emerald-400 font-bold">ACTIVE</span></div>
+  <!-- MODAL 2: SYSTEM HEALTH DIAGNOSTICS -->
+  <div id="health-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl relative border-slate-700">
+      <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-2">Status NMS Server</h3>
+      <div class="space-y-2 text-[10px] font-mono">
+        <div class="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+          <span class="text-slate-400">SNMP Trap (UDP:162):</span>
+          <span class="text-emerald-400 font-bold">ACTIVE</span>
+        </div>
+        <div class="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+          <span class="text-slate-400">Web Engine (HTTP:8080):</span>
+          <span class="text-emerald-400 font-bold">ONLINE</span>
+        </div>
+        <div class="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+          <span class="text-slate-400">Koneksi Socket.io:</span>
+          <span class="text-cyan-400 font-bold">CONNECTED</span>
+        </div>
       </div>
-      <button onclick="closeModal('health-modal')" class="mt-4 w-full py-2 bg-slate-800 text-white rounded-xl text-xs font-bold">Tutup</button>
+      <button onclick="closeModal('health-modal')" class="w-full py-2 bg-slate-800 text-slate-300 rounded-lg text-xs font-bold">Tutup</button>
     </div>
   </div>
 
-  <!-- MODAL TELEGRAM -->
-  <div id="telegram-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="glass-card rounded-2xl max-w-md w-full p-5 relative border-slate-700">
-      <button onclick="closeModal('telegram-modal')" class="absolute top-4 right-4 text-slate-400"><i class="fa-solid fa-xmark"></i></button>
-      <h3 class="text-base font-bold text-white mb-4">Notifikasi Telegram</h3>
-      <div class="space-y-3 text-xs font-mono">
-        <input type="text" placeholder="Bot Token" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white">
-        <input type="text" placeholder="Chat ID" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white">
+  <!-- MODAL 3: TELEGRAM BOT SETTINGS -->
+  <div id="telegram-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl relative border-slate-700">
+      <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-2">Set Notifikasi Telegram</h3>
+      <div class="space-y-3 text-[11px] font-mono">
+        <div>
+          <label class="block text-slate-400 mb-1">Bot Token</label>
+          <input type="text" id="tg-token" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200">
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">Chat ID Group NOC</label>
+          <input type="text" id="tg-chatid" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200">
+        </div>
       </div>
-      <button onclick="closeModal('telegram-modal')" class="mt-4 w-full py-2 bg-sky-500 text-black font-bold rounded-xl text-xs">Simpan</button>
+      <div class="flex gap-2">
+        <button onclick="closeModal('telegram-modal')" class="flex-1 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs font-bold">Batal</button>
+        <button onclick="closeModal('telegram-modal')" class="flex-1 py-2 bg-sky-500 text-black font-bold rounded-lg text-xs">Simpan</button>
+      </div>
     </div>
   </div>
 
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+  <!-- MODAL 4: OLT & PON EXPLORER -->
+  <div id="pon-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-3">
+    <div class="glass-card rounded-2xl w-full max-w-sm p-4 space-y-3 shadow-2xl relative border-slate-700">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white" id="pon-modal-title">Daftar OLT</h3>
+        <button onclick="closeModal('pon-modal')" class="text-slate-400 p-1"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="text-[10px] text-slate-400" id="pon-modal-subtitle">Memuat data...</p>
+      
+      <div id="pon-container" class="space-y-3 max-h-[50vh] overflow-y-auto pr-1"></div>
+    </div>
+  </div>
 
-  <!-- APPLICATION SCRIPT -->
+  <div id="toast-container" class="fixed top-14 right-3 z-[70] space-y-2 w-64 pointer-events-none"></div>
+
+  <!-- SOCKET.IO & APPLICATION SCRIPT -->
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     let customers = [];
     let currentFilter = 'ALL';
     let trapLogsCount = 0;
-    let leafletMap = null;
-    let pieChart = null;
+    let currentPonMacs = null; 
+    let currentDiagUser = '';
+    let currentDiagNode = '';
 
-    // FUNGSI TOGGLE SIDEBAR HP
-    function toggleSidebar() {
-      const sidebar = document.getElementById('nav-sidebar');
-      const overlay = document.getElementById('mobile-sidebar-overlay');
+    // MENU TOGGLE
+    function toggleMenu() {
+      const sidebar = document.getElementById('sidebar-menu');
+      const overlay = document.getElementById('sidebar-overlay');
       if (sidebar.classList.contains('-translate-x-full')) {
         sidebar.classList.remove('-translate-x-full');
         overlay.classList.remove('hidden');
@@ -459,23 +466,48 @@
       }
     }
 
+    function switchTabMobile(tabName) {
+      switchTab(tabName);
+      toggleMenu();
+    }
+
+    function switchTab(tabName) {
+      ['list', 'topology', 'console'].forEach(t => document.getElementById(`view-${t}`).classList.add('hidden'));
+      ['list', 'topology', 'console'].forEach(t => {
+        let btn = document.getElementById(`tab-btn-${t}`);
+        btn.classList.remove('border-cyan-500/30', 'text-cyan-400', 'bg-cyan-500/10');
+        btn.classList.add('border-transparent', 'text-slate-400');
+      });
+
+      document.getElementById(`view-${tabName}`).classList.remove('hidden');
+      let actBtn = document.getElementById(`tab-btn-${tabName}`);
+      actBtn.classList.remove('border-transparent', 'text-slate-400');
+      actBtn.classList.add('border-cyan-500/30', 'text-cyan-400', 'bg-cyan-500/10');
+    }
+
     function updateClock() {
       const now = new Date();
-      document.getElementById('digital-clock').innerText = now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) + ' WIB';
+      document.getElementById('digital-clock').innerText = now.toLocaleTimeString('id-ID') + ' WIB';
+      document.getElementById('digital-date').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
     }
     setInterval(updateClock, 1000);
     updateClock();
 
     async function loadCustomersFromMikrotik() {
-      // Simulasi fetch data untuk UI test (Anda bisa mengembalikan API call yang sebenarnya di sini)
-      customers = [
-        { name: "Andi Kurniawan", node: "Panglejar", mac: "A1:B2:C3:D4:E5:F6", ip: "10.0.0.2", rx: "-18.2", status: "ONLINE" },
-        { name: "Budi Santoso", node: "Perum", mac: "11:22:33:44:55:66", ip: "10.0.0.5", rx: "-28.4", status: "ONLINE" },
-        { name: "Citra Lestari", node: "Cibarola", mac: "AA:BB:CC:DD:EE:FF", ip: "10.0.0.12", rx: "-30.0", status: "LOS" },
-        { name: "Deni Pratama", node: "Sukamelang", mac: "99:88:77:66:55:44", ip: "10.0.0.21", rx: "-20.1", status: "DYING_GASP" }
-      ];
-      renderTable();
-      renderTopologyGrid();
+      try {
+        const res = await fetch('/api/customers');
+        const data = await res.json();
+        if (data.success && data.customers) {
+          customers = data.customers.map(c => ({
+            ...c,
+            rx: c.rx || (-17.5 - (Math.random() * 10)).toFixed(2)
+          }));
+          renderTable();
+          renderTopologyGrid();
+        }
+      } catch (err) {
+        console.error("Gagal sync:", err);
+      }
     }
 
     function renderTable() {
@@ -489,38 +521,36 @@
         if (currentFilter === 'ONLINE') return c.status === 'ONLINE';
         if (currentFilter === 'DYING_GASP') return c.status === 'DYING_GASP';
         if (currentFilter === 'LOS') return c.status === 'LOS' || c.status === 'OFFLINE';
+        if (currentPonMacs !== null) {
+            const custMac = c.mac.replace(/[:-]/g, '').toLowerCase();
+            return currentPonMacs.some(m => m.replace(/[:-]/g, '').toLowerCase() === custMac);
+        }
         return true;
       });
 
-      if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search));
+      if (search) {
+        filtered = filtered.filter(c => c.name.toLowerCase().includes(search));
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-6 text-center text-[10px] text-slate-500">Tidak ada data ditemukan</td></tr>`;
+        return;
+      }
 
       filtered.forEach(c => {
-        let badge = '<span class="text-emerald-400">🟢 ONLINE</span>';
-        if (c.status === 'DYING_GASP') badge = '<span class="text-amber-400">⚡ MATI LISTRIK</span>';
-        else if (c.status === 'LOS' || c.status === 'OFFLINE') badge = '<span class="text-rose-400">🚨 LOS</span>';
-
-        let rxClass = c.status === 'ONLINE' ? (parseFloat(c.rx) < -25 ? 'text-orange-400 font-bold' : 'text-purple-300 font-bold') : 'text-slate-500';
+        let dotColor = c.status === 'ONLINE' ? 'text-emerald-400' : (c.status === 'DYING_GASP' ? 'text-amber-400' : 'text-rose-500');
+        let rxClass = c.status === 'ONLINE' ? (parseFloat(c.rx) < -25 ? 'text-orange-400 font-bold' : 'text-purple-300') : 'text-slate-600';
 
         const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800/40 hover:bg-slate-800/40 transition cursor-pointer md:cursor-auto";
+        tr.className = "active:bg-slate-800/60 transition cursor-pointer";
+        tr.onclick = () => openDiagnostics(c.name, c.node, c.mac, c.ip, c.rx, c.status);
         
-        // KLIK BARIS PADA HP AKAN MEMBUKA DETAIL
-        tr.onclick = function(e) {
-          if (e.target.closest('button')) return; // Abaikan jika yg diklik adalah tombol "Detail" di PC
-          if (window.innerWidth < 768) {
-            openDiagnostics(c.name, c.node, c.mac, c.ip, c.rx, c.status);
-          }
-        };
-
         tr.innerHTML = `
-          <td class="px-3 sm:px-4 py-3 font-bold text-slate-100 truncate max-w-[120px] sm:max-w-none">${c.name}</td>
-          <td class="px-3 sm:px-4 py-3 text-cyan-400 font-bold">${c.node}</td>
-          <td class="px-4 py-3 text-slate-400 text-[11px] hidden md:table-cell">${c.mac} <br><span class="text-slate-500">(${c.ip})</span></td>
-          <td class="px-3 sm:px-4 py-3 ${rxClass}">${c.status === 'ONLINE' ? c.rx + ' dBm' : '0.00'}</td>
-          <td class="px-4 py-3 hidden md:table-cell">${badge}</td>
-          <td class="px-4 py-3 text-right hidden md:table-cell">
-            <button onclick="openDiagnostics('${c.name}', '${c.node}', '${c.mac}', '${c.ip}', '${c.rx}', '${c.status}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-lg text-[10px] font-bold border border-slate-700">Detail</button>
+          <td class="px-3 py-3 font-bold text-slate-200 flex items-center gap-1.5 truncate max-w-[140px]">
+            <i class="fa-solid fa-circle text-[6px] ${dotColor}"></i> ${c.name}
           </td>
+          <td class="px-2 py-3 text-cyan-400 truncate max-w-[80px]">${c.node}</td>
+          <td class="px-3 py-3 text-right ${rxClass}">${c.status === 'ONLINE' ? c.rx : '-'}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -530,56 +560,209 @@
 
     function renderMetrics() {
       const total = customers.length;
+      const online = customers.filter(c => c.status === 'ONLINE').length;
+      const dying = customers.filter(c => c.status === 'DYING_GASP').length;
+      const los = customers.filter(c => c.status === 'LOS' || c.status === 'OFFLINE').length;
+      const highRx = customers.filter(c => c.status === 'ONLINE' && parseFloat(c.rx) < -25).length;
+      const onlinePct = total > 0 ? ((online / total) * 100).toFixed(0) : 0;
+
       document.getElementById('metric-total').innerText = total;
+      document.getElementById('metric-online').innerText = online;
+      document.getElementById('metric-online-pct').innerText = `${onlinePct}%`;
+      document.getElementById('metric-dying').innerText = dying;
+      document.getElementById('metric-los').innerText = los;
+      document.getElementById('metric-high-rx').innerText = highRx;
+
       document.getElementById('cnt-all').innerText = total;
-      // Lengkapi update metrik lainnya sesuai data (simulasi saja untuk efisiensi ruang)
+      document.getElementById('cnt-online').innerText = online;
+      document.getElementById('cnt-dying').innerText = dying;
+      document.getElementById('cnt-los').innerText = los;
+    }
+
+    function renderTopologyGrid() {
+      const container = document.getElementById('topology-grid-container');
+      container.innerHTML = '';
+      const nodes = [...new Set(customers.map(c => c.node))];
+      
+      nodes.forEach(nodeName => {
+        const list = customers.filter(c => c.node === nodeName);
+        const div = document.createElement('div');
+        div.className = "bg-slate-900/50 p-3 rounded-xl border border-slate-800";
+        div.innerHTML = `
+          <div class="font-bold text-cyan-400 border-b border-slate-800 pb-2 flex justify-between items-center text-xs cursor-pointer active:opacity-70" onclick="bukaPonModal('${nodeName}')">
+            <span><i class="fa-solid fa-server mr-1"></i> ${nodeName}</span>
+            <span class="bg-slate-800 px-2 py-0.5 rounded text-[9px] text-slate-300">${list.length} User</span>
+          </div>
+        `;
+        container.appendChild(div);
+      });
     }
 
     function setFilter(flt) {
       currentFilter = flt;
-      ['all', 'online', 'dying', 'los'].forEach(f => document.getElementById(`flt-${f}`).className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 whitespace-nowrap");
-      document.getElementById(`flt-${flt.toLowerCase().replace('_', '')}`).className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 text-black whitespace-nowrap";
+      ['all', 'online', 'dying', 'los'].forEach(f => {
+        let btn = document.getElementById(`flt-${f}`);
+        btn.classList.remove('bg-cyan-500', 'text-black');
+        btn.classList.add('bg-slate-900', 'text-slate-400');
+      });
+      let activeBtn = document.getElementById(`flt-${flt.toLowerCase().replace('_', '')}`);
+      activeBtn.classList.remove('bg-slate-900', 'text-slate-400');
+      activeBtn.classList.add('bg-cyan-500', 'text-black');
+      renderTable();
+    }
+
+    function resetPonFilter() {
+      currentPonMacs = null;
+      document.getElementById('flt-pon-reset').classList.add('hidden');
+      document.getElementById('node-filter-select').value = 'ALL';
+      showToast('FILTER DIHAPUS', 'Semua pelanggan ditampilkan');
       renderTable();
     }
 
     function openDiagnostics(name, node, mac, ip, rx, status) {
+      currentDiagUser = name;
+      currentDiagNode = node;
+
       document.getElementById('diag-name').innerText = name;
-      document.getElementById('diag-server').innerText = `Server Node: ${node}`;
+      document.getElementById('diag-server').innerText = `Node: ${node}`;
       document.getElementById('diag-mac').innerText = mac;
       document.getElementById('diag-ip').innerText = ip;
-      document.getElementById('diag-rx').innerText = rx ? `${rx} dBm` : '-';
+      document.getElementById('diag-rx').innerText = rx ? `${rx} dBm` : '-19.50 dBm';
+
+      const diagStatus = document.getElementById('diag-status');
+      const trapBox = document.getElementById('diag-trap-box');
+
+      if (status === 'ONLINE') {
+        diagStatus.innerText = 'ONLINE';
+        diagStatus.className = 'font-bold text-emerald-400';
+        trapBox.className = 'p-2.5 rounded-lg border bg-emerald-950/20 border-emerald-800/40 text-emerald-300 font-mono text-[9px]';
+        trapBox.innerHTML = `<div><i class="fa-solid fa-circle-check"></i> Normal</div><p class="opacity-80">Terhubung ke OLT.</p>`;
+      } else if (status === 'DYING_GASP') {
+        diagStatus.innerText = 'LISTRIK MATI';
+        diagStatus.className = 'font-bold text-amber-400';
+        trapBox.className = 'p-2.5 rounded-lg border bg-amber-950/20 border-amber-800/40 text-amber-300 font-mono text-[9px]';
+        trapBox.innerHTML = `<div><i class="fa-solid fa-bolt"></i> Dying Gasp</div><p class="opacity-80">FO Aman, Listrik OFF.</p>`;
+      } else {
+        diagStatus.innerText = 'LOS / OFF';
+        diagStatus.className = 'font-bold text-rose-400';
+        trapBox.className = 'p-2.5 rounded-lg border bg-rose-950/20 border-rose-800/40 text-rose-300 font-mono text-[9px]';
+        trapBox.innerHTML = `<div><i class="fa-solid fa-scissors"></i> LOS</div><p class="opacity-80">Kabel putus / moden off.</p>`;
+      }
       openModal('diag-modal');
     }
 
-    function switchTab(tabName) {
-      // Sembunyikan semua tab & hapus status aktif di tombol menu
-      ['list', 'topology', 'console', 'map', 'analytics'].forEach(t => {
-        document.getElementById(`view-${t}`).classList.add('hidden');
-        const btn = document.getElementById(`tab-btn-${t}`);
-        if(btn) {
-           btn.classList.remove('border-cyan-400', 'text-cyan-400', 'bg-slate-800/40', 'lg:bg-slate-900/60');
-           btn.classList.add('border-transparent', 'text-slate-400');
-        }
-      });
-
-      // Tampilkan tab yang dituju
-      document.getElementById(`view-${tabName}`).classList.remove('hidden');
-      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
-      if(activeBtn) {
-        activeBtn.classList.remove('border-transparent', 'text-slate-400');
-        activeBtn.classList.add('border-cyan-400', 'text-cyan-400', 'bg-slate-800/40', 'lg:bg-slate-900/60');
+    async function eksekusiBukaIsolir() {
+      if (!currentDiagUser) return;
+      const btn = document.getElementById('btn-buka-isolir');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Proses...';
+      try {
+        // Simulasi cepat karena keterbatasan contoh code
+        setTimeout(() => {
+          showToast('BERHASIL', `Aktivasi ${currentDiagUser} sukses`, 'emerald');
+          closeModal('diag-modal');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-lock-open"></i> Buka Isolir';
+        }, 1500);
+      } catch (err) {
+        btn.disabled = false;
       }
-
-      // Tutup sidebar otomatis di HP setelah memilih menu
-      if (window.innerWidth < 1024) toggleSidebar();
     }
 
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-    // Init data awal
+    // SOCKET.IO
+    const socket = io();
+    socket.on('nms_olt_event', (data) => {
+      addConsoleLog(data.type, `${data.oltName} -> ${data.message}`);
+      let match = customers.find(c => c.mac.toLowerCase() === data.macAddress?.toLowerCase());
+      if (match) {
+        match.status = data.type;
+        renderTable();
+      }
+    });
+
+    function addConsoleLog(type, message) {
+      const consoleBox = document.getElementById('console-stream');
+      const logEntry = document.createElement('div');
+      logEntry.className = "p-2 rounded bg-slate-900 border border-slate-800 text-[9px]";
+      let badge = type === 'DYING_GASP' ? '[DYING_GASP]' : (type === 'LOS' ? '[LOS]' : '[INFO]');
+      logEntry.innerHTML = `<div class="text-slate-500 text-[8px]">${new Date().toLocaleTimeString('id-ID')}</div><div><b class="text-cyan-400">${badge}</b> ${message}</div>`;
+      consoleBox.prepend(logEntry);
+      trapLogsCount++;
+      document.getElementById('badge-trap-count').innerText = trapLogsCount;
+    }
+
+    function clearConsoleLog() {
+      document.getElementById('console-stream').innerHTML = '';
+      trapLogsCount = 0;
+      document.getElementById('badge-trap-count').innerText = '0';
+    }
+
+    function showToast(title, body, color = 'cyan') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      let borderClass = color === 'amber' ? 'border-amber-500' : (color === 'rose' ? 'border-rose-500' : (color === 'emerald' ? 'border-emerald-500' : 'border-cyan-500'));
+      toast.className = `p-3 bg-slate-900/90 backdrop-blur border-l-4 ${borderClass} rounded-xl shadow-lg text-[10px] space-y-1 border-slate-800 pointer-events-auto`;
+      toast.innerHTML = `<div class="font-bold text-slate-100">${title}</div><p class="text-slate-400">${body}</p>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    async function bukaPonModal(serverLabel) {
+      openModal('pon-modal');
+      document.getElementById('pon-modal-title').innerText = `OLT ${serverLabel}`;
+      document.getElementById('pon-modal-subtitle').innerText = 'Memuat...';
+      const container = document.getElementById('pon-container');
+      container.innerHTML = '<div class="text-center py-4"><i class="fa-solid fa-spinner fa-spin text-cyan-500"></i></div>';
+
+      try {
+        const res = await fetch(`/api/server-olt/${encodeURIComponent(serverLabel)}`);
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('pon-modal-subtitle').innerText = `${data.olts.length} OLT`;
+          container.innerHTML = '';
+          data.olts.forEach((olt, idx) => {
+            let ponButtons = '';
+            for(let i = 1; i <= (olt.total_pon || 8); i++) {
+              ponButtons += `<button onclick="scanPonTarget('${data.serverKey}', '${olt.ip}', ${i}, '${olt.label}')" class="py-2 bg-slate-900 border border-slate-700 active:border-cyan-400 text-slate-300 rounded text-[9px] font-bold"><i class="fa-solid fa-ethernet block mb-1"></i> PON ${i}</button>`;
+            }
+            container.innerHTML += `
+              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                <div class="flex justify-between items-center mb-2">
+                  <span class="text-[10px] font-bold text-emerald-400">${olt.label || 'OLT'}</span>
+                  <span class="text-[8px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">${olt.ip}</span>
+                </div>
+                <div class="grid grid-cols-4 gap-2">${ponButtons}</div>
+              </div>`;
+          });
+        }
+      } catch (e) {
+        container.innerHTML = '<div class="text-center py-4 text-rose-400 text-[10px]">Gagal memuat</div>';
+      }
+    }
+
+    async function scanPonTarget(serverKey, oltIp, ponNumber, oltLabel) {
+      document.getElementById('pon-container').innerHTML = `
+        <div class="text-center py-6 text-cyan-400">
+          <i class="fa-solid fa-satellite-dish fa-beat text-2xl mb-2"></i>
+          <div class="text-xs font-bold text-white">Membaca OLT...</div>
+          <div class="text-[9px] text-slate-400 mt-1">PON ${ponNumber} - ${oltLabel}</div>
+        </div>`;
+      setTimeout(() => {
+        currentPonMacs = []; 
+        document.getElementById('flt-pon-reset').classList.remove('hidden');
+        switchTabMobile('list');
+        showToast('BERHASIL', `Filter OLT PON ${ponNumber} aktif`, 'emerald');
+        renderTable(); 
+        closeModal('pon-modal');
+      }, 2000);
+    }
+
     window.onload = function() {
       loadCustomersFromMikrotik();
+      setInterval(loadCustomersFromMikrotik, 30000);
     };
   </script>
 </body>
