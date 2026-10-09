@@ -70,22 +70,28 @@ try {
 }
 
 // ==========================================
-// 🔄 API AUTO-SYNC PELANGGAN DARI MIKROTIK
+// 🔄 API AUTO-SYNC PELANGGAN DARI MIKROTIK (PARALEL)
 // ==========================================
 app.get('/api/customers', async (req, res) => {
     try {
-        let allCustomers = [];
+        const serverKeys = Object.keys(config.servers);
         
-        for (const srvKey of Object.keys(config.servers)) {
+        // Jalankan query ke semua MikroTik secara BERSAMAAN
+        const results = await Promise.allSettled(serverKeys.map(async (srvKey) => {
+            let nodeCustomers = [];
+            let api;
             try {
-                const { api, targetServer } = await connectMikrotik(srvKey);
+                const { api: mikrotikApi, targetServer } = await connectMikrotik(srvKey);
+                api = mikrotikApi;
+                
+                // Ambil secret dan user aktif
                 const secrets = await getUserSecrets(api);
                 const activeUsers = await getActiveUsers(api);
 
                 secrets.forEach(sec => {
                     if (sec.name) {
                         const act = activeUsers.find(a => a.name && a.name.toLowerCase() === sec.name.toLowerCase());
-                        allCustomers.push({
+                        nodeCustomers.push({
                             name: sec.name,
                             node: `${targetServer.label}`,
                             status: act ? 'ONLINE' : 'OFFLINE',
@@ -94,19 +100,23 @@ app.get('/api/customers', async (req, res) => {
                         });
                     }
                 });
-
-                await safeCloseMikrotik(api);
             } catch (err) {
                 console.log(`⚠️ Gagal sync dari MikroTik ${srvKey}:`, err.message);
+            } finally {
+                // Pastikan koneksi selalu ditutup
+                if (api) await safeCloseMikrotik(api);
             }
-        }
+            return nodeCustomers;
+        }));
 
+        // Gabungkan hasil dari semua server yang sukses merespon
+        const allCustomers = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
         res.json({ success: true, customers: allCustomers });
+
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
 });
-
 async function getUserSecrets(api) {
     try { return await withTimeout(api.write('/ppp/secret/print'), 10000, 'Timeout Secret'); } catch (e) { return []; }
 }
