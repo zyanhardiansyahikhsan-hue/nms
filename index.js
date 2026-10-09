@@ -197,17 +197,16 @@ async function connectMikrotik(serverKey) {
         port: targetServer.mikrotik.port,
         user: targetServer.mikrotik.user,
         password: targetServer.mikrotik.pass,
-        timeout: 15
+        timeout: 5 // Dipercepat menjadi 5 detik
     });
     try {
-        await withTimeout(api.connect(), 15000, `Timeout koneksi ke MikroTik ${targetServer.label}.`);
+        await withTimeout(api.connect(), 5000, `Timeout koneksi ke MikroTik ${targetServer.label}.`); // Dipercepat menjadi 5000 ms
         return { api, targetServer };
     } catch (err) {
         safeCloseMikrotik(api).catch(() => {});
         throw new Error(`Gagal konek MikroTik ${targetServer.label}.`);
     }
 }
-
 async function getUserFromMikrotik(api, username) {
     let secrets = await withTimeout(api.write('/ppp/secret/print', [`?name=${username}`]), 25000, 'Timeout Query Secret.');
     let userObj = secrets.find(x => x.name && x.name.trim().toLowerCase() === username.trim().toLowerCase());
