@@ -70,13 +70,17 @@ try {
 }
 
 // ==========================================
-// 🔄 API AUTO-SYNC PELANGGAN DARI MIKROTIK (PARALEL)
+// 🔄 SISTEM CACHE & BACKGROUND SYNC PELANGGAN
 // ==========================================
-app.get('/api/customers', async (req, res) => {
+let globalCustomerCache = [];
+let isFetchingCache = false;
+
+async function updateCustomerCache() {
+    if (isFetchingCache) return;
+    isFetchingCache = true;
     try {
         const serverKeys = Object.keys(config.servers);
         
-        // Jalankan query ke semua MikroTik secara BERSAMAAN
         const results = await Promise.allSettled(serverKeys.map(async (srvKey) => {
             let nodeCustomers = [];
             let api;
@@ -84,9 +88,11 @@ app.get('/api/customers', async (req, res) => {
                 const { api: mikrotikApi, targetServer } = await connectMikrotik(srvKey);
                 api = mikrotikApi;
                 
-                // Ambil secret dan user aktif
-                const secrets = await getUserSecrets(api);
-                const activeUsers = await getActiveUsers(api);
+                // SUPER PARALEL: Ambil Secret & Active dalam waktu bersamaan
+                const [secrets, activeUsers] = await Promise.all([
+                    getUserSecrets(api),
+                    getActiveUsers(api)
+                ]);
 
                 secrets.forEach(sec => {
                     if (sec.name) {
@@ -101,23 +107,36 @@ app.get('/api/customers', async (req, res) => {
                     }
                 });
             } catch (err) {
-                console.log(`⚠️ Gagal sync dari MikroTik ${srvKey}:`, err.message);
+                // Abaikan error di background agar console tidak penuh
             } finally {
-                // Pastikan koneksi selalu ditutup
                 if (api) await safeCloseMikrotik(api);
             }
             return nodeCustomers;
         }));
 
-        // Gabungkan hasil dari semua server yang sukses merespon
-        const allCustomers = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-        res.json({ success: true, customers: allCustomers });
-
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        // Timpa memori dengan data terbaru jika koneksi sukses
+        const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+        if (newCache.length > 0) {
+            globalCustomerCache = newCache;
+        }
+    } finally {
+        isFetchingCache = false;
     }
-});
-async function getUserSecrets(api) {
+}
+
+// 1. Jalankan sync saat aplikasi pertama kali menyala di Railway
+updateCustomerCache();
+
+// 2. Lakukan update data di belakang layar setiap 20 detik (20000 milidetik)
+setInterval(updateCustomerCache, 20000);
+
+// ==========================================
+// 🔄 API GET CUSTOMERS (INSTAN)
+// ==========================================
+app.get('/api/customers', (req, res) => {
+    // API ini langsung memuntahkan data dari memori RAM, tanpa perlu nunggu MikroTik!
+    res.json({ success: true, customers: globalCustomerCache });
+});async function getUserSecrets(api) {
     try { return await withTimeout(api.write('/ppp/secret/print'), 10000, 'Timeout Secret'); } catch (e) { return []; }
 }
 async function getActiveUsers(api) {
