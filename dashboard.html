@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="id" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google" content="notranslate">
+    <title>CREATED; IYANN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-void: #05070a;
+            --bg-panel: rgba(10, 15, 25, 0.85);
+            --cyber-cyan: #00f0ff;
+            --cyber-cyan-dim: rgba(0, 240, 255, 0.2);
+            --cyber-orange: #ff3c00;
+            --cyber-orange-dim: rgba(255, 60, 0, 0.2);
+            --hacker-green: #00ff41;
+            --text-main: #e2e8f0; 
+            --text-muted: #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Chakra Petch', sans-serif; }
+        
+        body { 
+            background-color: #05070a; 
+            color: #e2e8f0; 
+            line-height: 1.5; 
+            padding: 15px;
+            background-image: 
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            background-position: center center;
+        }
+
+        #matrixCanvas {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -1; opacity: 0.15; pointer-events: none;
+        }
+
+        .container { max-width: 600px; margin: 0 auto; position: relative; }
+
+        .header { 
+            padding-bottom: 10px; border-bottom: 1px solid rgba(0, 240, 255, 0.2); 
+            margin-bottom: 25px; display: flex; align-items: center; min-height: 45px; position: relative;
+        }
+        
+        .header::after {
+            content: ''; position: absolute; bottom: -2px; left: 0; width: 30%; height: 3px; background: #00f0ff; box-shadow: 0 0 10px #00f0ff;
+        }
+        
+        .typewriter-text { font-size: 18px; font-weight: 700; color: #00f0ff; font-family: 'Fira Code', monospace; letter-spacing: 1px; text-transform: uppercase; }
+        .cursor { font-size: 18px; font-weight: bold; color: #00f0ff; animation: blink 0.8s step-end infinite; margin-left: 5px; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .tabs { display: flex; gap: 15px; margin-bottom: 25px; }
+        .tab-btn { 
+            flex: 1; padding: 12px; background: transparent; 
+            border: 1px solid #64748b; color: #64748b; 
+            font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.3s ease; 
+            text-transform: uppercase; letter-spacing: 1px;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+        .tab-btn:hover { border-color: #e2e8f0; color: #e2e8f0; }
+        .tab-btn.active[data-tab="0"] { background: rgba(0, 240, 255, 0.2); color: #00f0ff; border-color: #00f0ff; box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.2); }
+        .tab-btn.active[data-tab="1"] { background: rgba(255, 60, 0, 0.2); color: #ff3c00; border-color: #ff3c00; box-shadow: inset 0 0 10px rgba(255, 60, 0, 0.2); }
+
+        .panel { display: none; }
+        .panel.active { display: block; animation: hudFadeIn 0.4s ease-out forwards; }
+        @keyframes hudFadeIn { from { opacity: 0; transform: scale(0.98) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        .card { 
+            background: rgba(10, 15, 25, 0.85); border: 1px solid rgba(0, 240, 255, 0.2); 
+            padding: 25px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(5px);
+        }
+
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .form-control { 
+            width: 100%; padding: 12px 15px; background: rgba(0,0,0,0.5); 
+            border: 1px solid #1e293b; border-left: 3px solid #64748b;
+            color: #ffffff; font-size: 15px; transition: 0.3s ease; font-family: 'Fira Code', monospace;
+        }
+        .form-control:focus { outline: none; border-color: #00f0ff; border-left: 3px solid #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.2); background: rgba(0, 240, 255, 0.05); }
+        
+        select.form-control { appearance: auto; cursor: pointer; color-scheme: dark; }
+        select.form-control option { background-color: #05070a; color: #00f0ff; font-family: 'Fira Code', monospace; font-weight: 600; padding: 10px; }
+
+        .btn { 
+            width: 100%; padding: 14px; background: transparent; border: 1px solid; 
+            font-size: 15px; font-weight: 700; color: #ffffff; cursor: pointer; transition: 0.3s ease; 
+            text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; justify-content: center; margin-top: 10px;
+        }
+        .btn-blue { border-color: #00f0ff; color: #00f0ff; }
+        .btn-blue:hover { background: #00f0ff; color: #000; box-shadow: 0 0 20px #00f0ff; }
+        .btn-orange { border-color: #ff3c00; color: #ff3c00; }
+        .btn-orange:hover { background: #ff3c00; color: #000; box-shadow: 0 0 20px #ff3c00; }
+
+        .result-box { margin-top: 25px; padding-top: 25px; border-top: 1px dashed rgba(0, 240, 255, 0.2); display: none; }
+        .result-box.show { display: block; }
+        .status-banner { padding: 12px; font-weight: 700; font-size: 14px; margin-bottom: 15px; text-transform: uppercase; background: rgba(0, 240, 255, 0.1); border-left: 4px solid #00f0ff; color: #00f0ff; }
+        
+        .data-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .data-item { background: rgba(0,0,0,0.4); border: 1px solid #1e293b; padding: 12px; }
+        .data-label { font-size: 10px; color: #64748b; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px; }
+        .data-value { font-family: 'Fira Code', monospace; font-size: 13px; color: #ffffff; word-break: break-all; }
+        
+        .value-cyan { color: #00f0ff; }
+        .value-orange { color: #ff3c00; }
+        .value-red { color: #ff0000; }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrixCanvas"></canvas>
+
+    <div class="container">
+        <div class="header">
+            <div>
+                <span id="typewriterText" class="typewriter-text"></span><span class="cursor">_</span>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="0">Parios Redaman</button>
+            <button class="tab-btn" data-tab="1">Aktipkeun Isolir</button>
+        </div>
+
+        <div class="panel active" id="panel0">
+            <div class="card">
+                <form id="formCek">
+                    <div class="form-group">
+                        <label class="form-label">Pilih Server OLT</label>
+                        <select class="form-control" id="serverCek" required>
+                            <option value="">-- PILIH SERVER --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Username Pelanggan</label>
+                        <input type="text" class="form-control" id="usernameCek" placeholder="ASEUPKEUN WAN" required autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-blue" id="btnCek">MULAI PARIOS</button>
+                </form>
+
+                <div id="resultCek" class="result-box"></div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel1">
+            <div class="card">
+                <form id="formAktivasi">
+                    <div class="form-group">
+                        <label class="form-label">Pilih Server Mikrotik</label>
+                        <select class="form-control" id="serverAktivasi" required>
+                            <option value="">-- PILIH SERVER --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Username Pelanggan</label>
+                        <input type="text" class="form-control" id="usernameAktivasi" placeholder="ASEUPKEUN WAN" required autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-orange" id="btnAktivasi">JALANKEUN AKTIVASI</button>
+                </form>
+
+                <div id="resultAktivasi" class="result-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const chars = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレゲゼデベペオォコソトノホモヨョロゴゾドボポヴッン0123456789';
+        const fontSize = 14;
+        let columns = canvas.width / fontSize;
+        let drops = Array(Math.floor(columns)).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(5, 7, 10, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ff41';
+            ctx.font = fontSize + 'px "Fira Code", monospace';
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 33);
+
+        const textToType = "[SYS] Parios Redaman & Aktivasi Isolir";
+        const typeTarget = document.getElementById("typewriterText");
+        let typeIndex = 0;
+        function typeWriter() {
+            if (typeIndex < textToType.length) {
+                typeTarget.innerHTML += textToType.charAt(typeIndex);
+                typeIndex++;
+                setTimeout(typeWriter, 80);
+            }
+        }
+        setTimeout(typeWriter, 500);
+
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const panels = document.querySelectorAll('.panel');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.getAttribute('data-tab');
+                tabBtns.forEach(b => b.classList.remove('active'));
+                panels.forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`panel${target}`).classList.add('active');
+            });
+        });
+
+        async function loadServers() {
+            try {
+                const res = await fetch('/api/servers');
+                const data = await res.json();
+                const selCek = document.getElementById('serverCek');
+                const selAkt = document.getElementById('serverAktivasi');
+                data.servers.forEach(srv => {
+                    selCek.add(new Option(srv.label, srv.key));
+                    selAkt.add(new Option(srv.label, srv.key));
+                });
+            } catch (err) {}
+        }
+
+        function parseOLTResult(oltText) {
+            if(!oltText) return { oltName: 'TEU KANYAHOAN', redaman: 'N/A', status: 'TEU KANYAHOAN' };
+            const lines = oltText.split('\n').filter(line => line.trim());
+            const oltName = lines[0]?.replace(/[✅*]/g, '').trim() || 'OLT';
+            const redaman = lines[1]?.match(/Redaman:\s*\*?([^\*]*)\*?/)?.[1].trim() || 'N/A';
+            const status = lines[2]?.match(/Status:\s*(.*)/)?.[1].trim() || 'TEU KANYAHOAN';
+            return { oltName, redaman, status };
+        }
+
+        function buildDashboardResult(data, isAktivasi) {
+            let html = `<div class="status-banner">[✓] PROSES RENGSE</div><div class="data-grid">`;
+            html += `<div class="data-item"><div class="data-label">USERNAME</div><div class="data-value">${data.username || '-'}</div></div>`;
+            html += `<div class="data-item"><div class="data-label">SERVER</div><div class="data-value">${data.server || '-'}</div></div>`;
+            if(data.ip) html += `<div class="data-item"><div class="data-label">IP ADDRESS</div><div class="data-value">${data.ip}</div></div>`;
+            if(data.mac) html += `<div class="data-item"><div class="data-label">MAC ADDRESS</div><div class="data-value">${data.mac}</div></div>`;
+
+            if (data.olt && data.olt !== 'ONU tidak ditemukan di OLT manapun') {
+                const olt = parseOLTResult(data.olt);
+                let rxColor = (olt.redaman.includes('-') && parseFloat(olt.redaman) < -25) ? 'value-red' : 'value-cyan';
+                let statusColor = olt.status.includes('MATI LISTRIK') ? 'value-orange' : (olt.status.includes('LOSE KONEKSI') ? 'value-red' : 'value-cyan');
+
+                html += `<div class="data-item" style="grid-column: 1 / -1;"><div class="data-label">NGARAN OLT NODE</div><div class="data-value">${olt.oltName}</div></div>`;
+                html += `<div class="data-item"><div class="data-label">REDAMAN (RX)</div><div class="data-value ${rxColor}">${olt.redaman}</div></div>`;
+                html += `<div class="data-item"><div class="data-label">STATUS ONU</div><div class="data-value ${statusColor}">${olt.status}</div></div>`;
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        async function processScan(action, serverKey, username) {
+            const isAktivasi = action === 'aktivasi';
+            const targetName = isAktivasi ? 'Aktivasi' : 'Cek';
+            const resultDiv = document.getElementById(`result${targetName}`);
+            const btn = document.getElementById(`btn${targetName}`);
+            const endpoint = isAktivasi ? '/api/aktivasi' : '/api/cek-redaman';
+
+            btn.disabled = true; btn.innerText = 'NUJU EKSEKUSI...';
+            try {
+                const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serverKey, username }) });
+                const data = await res.json();
+                btn.disabled = false; btn.innerText = isAktivasi ? 'JALANKEUN AKTIVASI' : 'MULAI PARIOS';
+                if (data.success) {
+                    resultDiv.innerHTML = buildDashboardResult(data.data, isAktivasi);
+                    resultDiv.classList.add('show');
+                }
+            } catch (err) {
+                btn.disabled = false; btn.innerText = 'GAGAL';
+            }
+        }
+
+        document.getElementById('formCek').addEventListener('submit', (e) => { e.preventDefault(); processScan('cek', document.getElementById('serverCek').value, document.getElementById('usernameCek').value.trim()); });
+        document.getElementById('formAktivasi').addEventListener('submit', (e) => { e.preventDefault(); processScan('aktivasi', document.getElementById('serverAktivasi').value, document.getElementById('usernameAktivasi').value.trim()); });
+
+        loadServers();
+    </script>
+</body>
+</html>
