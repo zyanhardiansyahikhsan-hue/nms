@@ -77,7 +77,6 @@
     @keyframes pulseAmber { 70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } }
     @keyframes pulseRose { 70% { box-shadow: 0 0 0 12px rgba(244, 63, 94, 0); } }
 
-    
     html { -webkit-tap-highlight-color: transparent; }
     body { overscroll-behavior-y: none; }
     @media (max-width: 640px) { input, select { font-size: 16px !important; } }
@@ -223,7 +222,6 @@
       </div>
     </div>
 
-    
     <!-- VIEW 3: LIVE SNMP TRAP STREAM -->
     <div id="view-console" class="hidden space-y-4">
       <div class="glass-card rounded-2xl p-3 font-mono text-xs">
@@ -249,7 +247,6 @@
       </div>
     </div>
 
-    
   </main>
 
   <!-- MODAL 1: ONU FULL TELEMETRY DIAGNOSTICS -->
@@ -292,11 +289,19 @@
         <!-- Dynamic content -->
       </div>
 
-      <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-        <!-- Button Buka Isolir (Menggantikan Test Ping Latency) -->
-        <button id="btn-buka-isolir" onclick="eksekusiBukaIsolir()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-          <i class="fa-solid fa-lock-open"></i> Buka Isolir
-        </button>
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800 gap-2">
+        <div class="flex items-center gap-2">
+          <!-- Button Buka Isolir -->
+          <button id="btn-buka-isolir" onclick="eksekusiBukaIsolir()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-lock-open"></i> Buka Isolir
+          </button>
+
+          <!-- Button Reboot ONT (BARU) -->
+          <button id="btn-reboot-ont" onclick="eksekusiRebootOnt()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-power-off"></i> Reboot ONT
+          </button>
+        </div>
+
         <button onclick="closeModal('diag-modal')" class="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl font-bold text-xs transition">Tutup</button>
       </div>
     </div>
@@ -661,6 +666,76 @@
           if (data.status === 'done') {
             clearInterval(interval);
             showToast('BERHASIL', `Aktivasi/Buka Isolir untuk ${currentDiagUser} Berhasil!`, 'emerald');
+            closeModal('diag-modal');
+            loadCustomersFromMikrotik();
+          } else if (data.status === 'error') {
+            clearInterval(interval);
+            showToast('GAGAL', data.error || 'Terjadi kesalahan sistem', 'rose');
+          }
+        } catch (e) {
+          clearInterval(interval);
+        }
+      }, 2000);
+    }
+
+    // Eksekusi Reboot ONT / Reset Session PPPoE (BARU)
+    async function eksekusiRebootOnt() {
+      if (!currentDiagUser || !currentDiagNode) {
+        showToast('ERROR', 'Data pelanggan tidak ditemukan', 'rose');
+        return;
+      }
+
+      if (!confirm(`Yakin ingin me-restart koneksi ONT / PPPoE milik ${currentDiagUser}?`)) {
+        return;
+      }
+
+      const btn = document.getElementById('btn-reboot-ont');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+
+      try {
+        let serverKey = currentDiagNode;
+        const resServer = await fetch(`/api/server-olt/${encodeURIComponent(currentDiagNode)}`);
+        const dataServer = await resServer.json();
+        if (dataServer.success) {
+          serverKey = dataServer.serverKey;
+        }
+
+        const mac = document.getElementById('diag-mac').innerText;
+
+        const res = await fetch('/api/reboot-ont', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serverKey, username: currentDiagUser, mac })
+        });
+
+        const data = await res.json();
+        
+        if (data.queueId) {
+          pollRebootResult(data.queueId);
+        } else if (data.success) {
+          showToast('BERHASIL', `Restart koneksi ${currentDiagUser} Berhasil!`, 'emerald');
+          closeModal('diag-modal');
+          loadCustomersFromMikrotik();
+        } else {
+          showToast('GAGAL', data.error || 'Proses restart gagal', 'rose');
+        }
+      } catch (err) {
+        showToast('ERROR', 'Gagal terhubung ke API Reboot Server', 'rose');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-power-off"></i> Reboot ONT';
+      }
+    }
+
+    function pollRebootResult(queueId) {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/queue-result/${queueId}`);
+          const data = await res.json();
+          if (data.status === 'done') {
+            clearInterval(interval);
+            showToast('BERHASIL', `Restart koneksi ${currentDiagUser} Berhasil!`, 'emerald');
             closeModal('diag-modal');
             loadCustomersFromMikrotik();
           } else if (data.status === 'error') {
