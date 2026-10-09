@@ -136,7 +136,9 @@ setInterval(updateCustomerCache, 20000);
 app.get('/api/customers', (req, res) => {
     // API ini langsung memuntahkan data dari memori RAM, tanpa perlu nunggu MikroTik!
     res.json({ success: true, customers: globalCustomerCache });
-});async function getUserSecrets(api) {
+});
+
+async function getUserSecrets(api) {
     try { return await withTimeout(api.write('/ppp/secret/print'), 10000, 'Timeout Secret'); } catch (e) { return []; }
 }
 async function getActiveUsers(api) {
@@ -184,12 +186,11 @@ app.post('/api/scan-pon', async (req, res) => {
         if (!targetOlt) throw new Error('Konfigurasi OLT tidak ditemukan');
 
         // Panggil fungsi scan dari oltService untuk mengambil MAC list pada PON tersebut
-        // (Pastikan fungsi ini mengambil MAC dari OLT berdasarkan nomor PON)
         await scanSemuaOlt([targetOlt], null, async (teksHasil, macList) => {
             if (macList && Array.isArray(macList)) {
                 foundMacs = macList;
             }
-        }, pon); // Kirim parameter PON jika didukung oltService
+        }, pon);
 
         return { serverKey, oltIp, pon, macs: foundMacs };
     }, 'SYSTEM_SCAN', targetServer.label);
@@ -216,16 +217,17 @@ async function connectMikrotik(serverKey) {
         port: targetServer.mikrotik.port,
         user: targetServer.mikrotik.user,
         password: targetServer.mikrotik.pass,
-        timeout: 5 // Dipercepat menjadi 5 detik
+        timeout: 5
     });
     try {
-        await withTimeout(api.connect(), 5000, `Timeout koneksi ke MikroTik ${targetServer.label}.`); // Dipercepat menjadi 5000 ms
+        await withTimeout(api.connect(), 5000, `Timeout koneksi ke MikroTik ${targetServer.label}.`);
         return { api, targetServer };
     } catch (err) {
         safeCloseMikrotik(api).catch(() => {});
         throw new Error(`Gagal konek MikroTik ${targetServer.label}.`);
     }
 }
+
 async function getUserFromMikrotik(api, username) {
     let secrets = await withTimeout(api.write('/ppp/secret/print', [`?name=${username}`]), 25000, 'Timeout Query Secret.');
     let userObj = secrets.find(x => x.name && x.name.trim().toLowerCase() === username.trim().toLowerCase());
@@ -362,6 +364,37 @@ app.post('/api/aktivasi', async (req, res) => {
             response.olt = oltText;
         }
         return response;
+    }, username, config.servers[serverKey]?.label || 'Unknown');
+    
+    await safeCloseMikrotik(api);
+    res.json(result);
+});
+
+// ==========================================
+// 🔄 API REBOOT ONT / RESET SESSION PPPOE (BARU)
+// ==========================================
+app.post('/api/reboot-ont', async (req, res) => {
+    const { serverKey, username, mac } = req.body;
+    if (!serverKey || !username) return res.status(400).json({ error: 'Server dan username wajib diisi' });
+
+    let api;
+    const result = await enqueueTask(async () => {
+        const { api: mikrotikApi, targetServer } = await connectMikrotik(serverKey);
+        api = mikrotikApi;
+
+        // Putus active session PPPoE MikroTik agar ONT/Router dial-up ulang
+        const activeUser = await getActiveUserFromMikrotik(api, username);
+        if (activeUser && activeUser['.id']) {
+            await api.write(['/ppp/active/remove', `=.id=${activeUser['.id']}`]);
+        }
+
+        return { 
+            username, 
+            server: targetServer.label, 
+            mac: mac || 'Unknown', 
+            status: 'BERHASIL', 
+            message: `Session PPPoE ${username} berhasil di-reset / disconnect.` 
+        };
     }, username, config.servers[serverKey]?.label || 'Unknown');
     
     await safeCloseMikrotik(api);
