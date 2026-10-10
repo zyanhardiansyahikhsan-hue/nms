@@ -21,7 +21,7 @@ const MAC_PREFIX_LEN = 10;            // 5 byte pertama MAC (sama dengan versi l
 const MAX_RETRY_PER_OLT = 2;
 const RETRY_DELAY_MS = 700;
 const DEADLINE_HSAIRPO_MS = 20000;    // batas keras 1x percobaan (bisa di-override: olt.timeout_ms)
-const DEADLINE_HIOSO_MS = 25000;
+const DEADLINE_HIOSO_MS = 30000;
 const SCAN_TOTAL_TIMEOUT_MS = 35000;  // batas keras seluruh scan
 const HIOSO_MAX_PER_IP = 2;           // maks pengecekan Hioso bersamaan ke IP yang sama
 const HIOSO_MAX_GLOBAL = 4;           // maks pengecekan Hioso bersamaan se-server
@@ -30,7 +30,8 @@ const SESI_TTL_MS = 3 * 60 * 1000;    // lama cache token/cookie login
 const BROWSER_IDLE_MS = 5 * 60 * 1000;
 const NAV_TIMEOUT_MS = 12000;
 const WAIT_DATA_MS = 5000;
-const HIOSO_HTTP_TIMEOUT_MS = 8000;
+const HIOSO_HTTP_TIMEOUT_MS = 20000;  // OLT lambat (mis. Perum) bisa butuh >8 dtk; bisa di-override: olt.http_timeout_ms
+const LONG_TIMEOUT_NO_RETRY_MS = 10000; // timeout selama ini = OLT lambat/macet, retry hanya menggandakan waktu tunggu
 
 // ==========================================
 // 1. UTILITAS
@@ -313,16 +314,24 @@ function cariBarisDiHtml(html, target) {
     return { halamanTerbaca: adaMac, baris: null };
 }
 
+const waktuMuatHioso = (olt) => olt.http_timeout_ms || HIOSO_HTTP_TIMEOUT_MS;
+
 async function cekHiosoViaHttp(olt, target, signal) {
+    const mulai = Date.now();
     const res = await axios.get(`http://${olt.ip}:${olt.port}/m/onu_all_onu.htm`, {
         auth: { username: olt.user || 'admin', password: olt.pass || 'admin' },
-        timeout: HIOSO_HTTP_TIMEOUT_MS,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+            Accept: 'text/html,application/xhtml+xml,*/*;q=0.8'
+        },
+        timeout: waktuMuatHioso(olt),
         signal,
         httpAgent: agentHioso,
         responseType: 'text',
         transformResponse: [(d) => d],
         maxRedirects: 2
     });
+    console.log(`   ⏱️ [${olt.label}] HTTP selesai ${Date.now() - mulai}ms (${Math.round(String(res.data).length / 1024)} KB)`);
     return cariBarisDiHtml(res.data, target);
 }
 
@@ -464,7 +473,7 @@ async function cekHiosoViaBrowser(olt, target, signal) {
         await page.authenticate({ username: olt.user || 'admin', password: olt.pass || 'admin' });
 
         if (olt.iframe) {
-            await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+            await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: waktuMuatHioso(olt) });
             const frame = await bukaDaftarOnuIframe(page);
             let baris = await cariBarisDiFrame(frame, target);
             if (!baris) {
@@ -477,7 +486,7 @@ async function cekHiosoViaBrowser(olt, target, signal) {
         }
 
         // Non-iframe: langsung ke halaman daftar ONU (tidak perlu buka root/frameset)
-        await page.goto(`${baseUrl}/m/onu_all_onu.htm`, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+        await page.goto(`${baseUrl}/m/onu_all_onu.htm`, { waitUntil: 'domcontentloaded', timeout: waktuMuatHioso(olt) });
         const utama = page.mainFrame();
         const anak = page.frames().find((f) => f !== utama && /onu/i.test(f.url()));
         const frame = anak || utama;
@@ -493,7 +502,7 @@ async function cekRedamanHioso(olt, target, signal) {
     console.log(`\n🔍 [${olt.label}] Mulai cek Hioso...`);
     const kunci = `${olt.ip}:${olt.port}`;
 
-    if (!olt.iframe && modeHioso.get(kunci) !== 'browser') {
+    if (!olt.iframe && olt.mode !== 'browser' && modeHioso.get(kunci) !== 'browser') {
         const h = await cekHiosoViaHttp(olt, target, signal);
         if (h.halamanTerbaca) return h.baris ? hasilHioso(olt, target, h.baris) : null;
         console.log(`   ℹ️ [${olt.label}] Halaman dirender JavaScript, pakai Puppeteer untuk OLT ini`);
@@ -509,8 +518,11 @@ async function cekRedamanHioso(olt, target, signal) {
 // ==========================================
 // checkerFn: (olt, target, signal) => hasil | null, dan melempar Error kalau gagal.
 // Return: hasil | null (tidak ditemukan / dibatalkan) | { error } (gagal setelah semua percobaan)
+const batasWaktuOlt = (olt) => olt.timeout_ms ||
+    (olt.type === 'Hioso' ? Math.max(DEADLINE_HIOSO_MS, (olt.http_timeout_ms || 0) + 8000) : DEADLINE_HSAIRPO_MS);
+
 async function cekDenganRetry(checkerFn, olt, target, signal, limiter = null) {
-    const batasMs = olt.timeout_ms || (olt.type === 'Hioso' ? DEADLINE_HIOSO_MS : DEADLINE_HSAIRPO_MS);
+    const batasMs = batasWaktuOlt(olt);
     let errTerakhir = 'tidak diketahui';
 
     for (let attempt = 1; attempt <= MAX_RETRY_PER_OLT; attempt++) {
@@ -519,12 +531,15 @@ async function cekDenganRetry(checkerFn, olt, target, signal, limiter = null) {
             try { await limiter.ambil(signal); } catch (e) { return null; }
         }
         const anak = buatSignalAnak(signal, batasMs);
+        const mulaiAttempt = Date.now();
         try {
             return await balapAbort(checkerFn(olt, target, anak.signal), anak.signal);
         } catch (err) {
             if (signal.aborted) return null; // dibatalkan karena OLT lain sudah ketemu
             errTerakhir = anak.signal.aborted ? `timeout (>${Math.round(batasMs / 1000)} dtk)` : err.message;
             console.log(`   🔁 [${olt.label}] Coba ${attempt}/${MAX_RETRY_PER_OLT} gagal: ${errTerakhir}`);
+            const isTimeout = anak.signal.aborted || /timeout|ETIMEDOUT/i.test(err.message);
+            if (isTimeout && Date.now() - mulaiAttempt >= LONG_TIMEOUT_NO_RETRY_MS) break; // jangan gandakan waktu tunggu
         } finally {
             anak.bersih();
             if (limiter) limiter.lepas();
@@ -558,7 +573,8 @@ async function scanSemuaOlt(oltList, mac, onFound, onGagal) {
     const controller = new AbortController();
     const gagal = [];
     let habisWaktu = false;
-    const timerTotal = setTimeout(() => { habisWaktu = true; controller.abort(); }, SCAN_TOTAL_TIMEOUT_MS);
+    const batasScanMs = Math.max(SCAN_TOTAL_TIMEOUT_MS, ...oltList.map(batasWaktuOlt).map((x) => x + 1000));
+    const timerTotal = setTimeout(() => { habisWaktu = true; controller.abort(); }, batasScanMs);
 
     const tugas = oltList.map(async (olt) => {
         try {
@@ -597,7 +613,7 @@ async function scanSemuaOlt(oltList, mac, onFound, onGagal) {
     clearTimeout(timerTotal);
 
     if (!ditemukan) {
-        if (habisWaktu) gagal.push(`Batas waktu scan ${SCAN_TOTAL_TIMEOUT_MS / 1000} dtk habis`);
+        if (habisWaktu) gagal.push(`Batas waktu scan ${batasScanMs / 1000} dtk habis`);
         console.log(`⏱️ Tidak ditemukan (${Date.now() - mulai}ms)${gagal.length ? `, ${gagal.length} OLT bermasalah` : ''}`);
         if (gagal.length && typeof onGagal === 'function') {
             try { await onGagal(gagal); } catch (e) { console.error('onGagal error:', e.message); }
