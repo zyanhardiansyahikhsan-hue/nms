@@ -107,7 +107,9 @@ async function cekRedamanHioso(oltConfig, mac) {
     
     try {
         const page = await browser.newPage();
-        page.setDefaultTimeout(15000);
+        
+        // PERBAIKAN: Naikkan timeout global ke 35 detik (35000ms) untuk OLT yang agak lambat seperti Perum
+        page.setDefaultTimeout(35000);
         
         // TURBO OPTIMIZATION: Blokir gambar, CSS, dan Font agar loading instan
         await page.setRequestInterception(true);
@@ -124,7 +126,9 @@ async function cekRedamanHioso(oltConfig, mac) {
         const pass = oltConfig.pass || 'admin';
         
         await page.authenticate({ username: user, password: pass });
-        await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        
+        // PERBAIKAN: Naikkan timeout login
+        await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 35000 }).catch(() => {});
         console.log(`   ✅ Login sukses di ${oltConfig.label}`);
         
         await new Promise(r => setTimeout(r, 1000));
@@ -159,7 +163,7 @@ async function cekRedamanHioso(oltConfig, mac) {
             }
             if (!mainFrame) throw new Error('Gagal memuat main frame');
             
-            try { await mainFrame.waitForSelector('table tr', { timeout: 10000 }); } catch (err) {}
+            try { await mainFrame.waitForSelector('table tr', { timeout: 15000 }); } catch (err) {}
             
             try {
                 await mainFrame.evaluate(() => {
@@ -189,14 +193,15 @@ async function cekRedamanHioso(oltConfig, mac) {
                 return { olt_name: oltConfig.label, mac_onu: searchMac, redaman: `${rxPowerResult} dBm`, status: 'Online' };
             }
         } else {
-            await page.goto(`${baseUrl}/m/onu_all_onu.htm`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-            await new Promise(r => setTimeout(r, 1000));
+            // PERBAIKAN: Naikkan timeout menu halaman utama OLT dan abaikan jika loadingnya nyangkut di script latar belakang
+            await page.goto(`${baseUrl}/m/onu_all_onu.htm`, { waitUntil: 'domcontentloaded', timeout: 35000 }).catch(e => console.log(`   ⚠️ Web lambat, ditoleransi...`));
+            await new Promise(r => setTimeout(r, 1500));
             
             let targetFrame = page;
             const frames = page.frames();
             if (frames.length > 1) { targetFrame = frames.find(f => f.url().includes('onu')) || frames[1]; }
             
-            try { await targetFrame.waitForSelector('table tr', { timeout: 10000 }); } catch (err) {}
+            try { await targetFrame.waitForSelector('table tr', { timeout: 15000 }); } catch (err) {}
             
             const rxPowerResult = await targetFrame.evaluate((macToFind) => {
                 const cleanTarget = macToFind.replace(/[:-]/g, '').toLowerCase();
