@@ -28,10 +28,10 @@ module.exports = {
             label: 'Sukamelang',
             mikrotik: { host: '103.191.165.100', port: 3150, user: 'berry', pass: 'Subang21' },
             olts: [
-                { type: 'HSAirpo', label: 'HSAirpo Sukamelang', ip: '103.191.165.100', port: 9900, user: 'root', pass: 'admin' },
-                { type: 'Hioso', label: 'Hioso 4Pon Baru Sukamelang', ip: '103.191.165.100', port: 671, user: 'admin', pass: 'admin', iframe: false },
+                { type: 'Hioso', label: 'Hioso 8Pon Sukamelang', ip: '103.191.165.100', port: 680, user: 'admin', pass: 'admin', iframe: true },
                 { type: 'Hioso', label: 'Hioso 4Pon Lama Sukamelang', ip: '103.191.165.100', port: 670, user: 'admin', pass: 'admin', iframe: false },
-                { type: 'Hioso', label: 'Hioso 8Pon Sukamelang', ip: '103.191.165.100', port: 680, user: 'admin', pass: 'admin', iframe: true }
+                { type: 'Hioso', label: 'Hioso 4Pon Baru Sukamelang', ip: '103.191.165.100', port: 671, user: 'admin', pass: 'admin', iframe: false },
+                { type: 'HSAirpo', label: 'HSAirpo Sukamelang', ip: '103.191.165.100', port: 9900, user: 'root', pass: 'admin' }
             ]
         }
     }
