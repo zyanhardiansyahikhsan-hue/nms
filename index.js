@@ -325,9 +325,15 @@ app.post('/api/cek-redaman', async (req, res) => {
         if (activeUser) rawMac = activeUser['caller-id'] || rawMac;
         if (!rawMac || rawMac === 'Any') throw new Error('MAC Address tidak terbaca');
         const mac = rawMac.trim().toLowerCase();
+        // ... (dalam /api/cek-redaman)
         let oltText = 'ONU tidak ditemukan di OLT manapun';
-        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { oltText = teksHasil; });
+        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { 
+            oltText = teksHasil; 
+            // PANCARKAN HASIL SEKETIKA KE FRONTEND LEWAT SOCKET!
+            io.emit('realtime_redaman_result', { username, redamanText: teksHasil });
+        });
         return { username, server: targetServer.label, mac, olt: oltText };
+// ...
     }, username, config.servers[serverKey]?.label || 'Unknown');
     
     await safeCloseMikrotik(api);
