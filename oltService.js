@@ -35,7 +35,7 @@ function parseOnuStatusAndRx(rxPower, statusRaw, fullObjectOrText) {
 
 async function cekRedamanHSAirpoAPI(oltConfig, mac) {
     try {
-        const searchMac = mac.substring(0, 15);
+        const searchMac = mac.substring(0, 16);
         const username = oltConfig.user || 'root';
         const password = oltConfig.pass || 'admin';
         const key = crypto.createHash('md5').update(`${username}:${password}`).digest('hex');
@@ -114,7 +114,7 @@ async function cekRedamanHSAirpoCibarola(oltConfig, mac) {
 }
 
 async function cekRedamanHioso(oltConfig, mac) {
-    let searchMac = mac.substring(0, 15);
+    let searchMac = mac.substring(0, 16);
     if (oltConfig.label.includes('Cibarola') || oltConfig.label.includes('8Pon')) searchMac = mac.substring(0, 15);
     
     const browser = await puppeteer.launch({
