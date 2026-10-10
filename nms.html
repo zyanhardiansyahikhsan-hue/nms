@@ -435,7 +435,7 @@
         if (data.success && data.customers) {
           customers = data.customers.map(c => ({
             ...c,
-            rx: c.rx || (-17.5 - (Math.random() * 10)).toFixed(2)
+            rx: c.rx || '-'
           }));
           renderTable(true);
           renderTopologyGrid();
