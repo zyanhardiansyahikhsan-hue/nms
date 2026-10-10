@@ -169,32 +169,33 @@ app.get('/api/server-olt/:serverLabel', (req, res) => {
 // ==========================================
 // 🔄 API SCAN MAC ADDRESS DI PON SPESIFIK (CARA 2)
 // ==========================================
-app.post('/api/scan-pon', async (req, res) => {
-    const { serverKey, oltIp, pon } = req.body;
-    if (!serverKey || !oltIp || !pon) return res.status(400).json({ error: 'Parameter tidak lengkap' });
-
-    const targetServer = config.servers[serverKey];
-    if (!targetServer) return res.status(404).json({ error: 'Server tidak ditemukan' });
-
+app.post('/api/cek-redaman', async (req, res) => {
+    const { serverKey, username } = req.body;
+    if (!serverKey || !username) return res.status(400).json({ error: 'Server dan username wajib diisi' });
+    let api;
     const result = await enqueueTask(async () => {
-        console.log(`[SCAN PON] Membaca ONU di OLT ${oltIp} PON ${pon}...`);
+        const { api: mikrotikApi, targetServer } = await connectMikrotik(serverKey);
+        api = mikrotikApi;
+        const userObj = await getUserFromMikrotik(api, username);
+        let rawMac = userObj['caller-id'] || 'Any';
+        const activeUser = await getActiveUserFromMikrotik(api, username);
+        if (activeUser) rawMac = activeUser['caller-id'] || rawMac;
+        if (!rawMac || rawMac === 'Any') throw new Error('MAC Address tidak terbaca');
+        const mac = rawMac.trim().toLowerCase();
+        let oltText = 'ONU tidak ditemukan di OLT manapun';
         
-        let foundMacs = [];
-        
-        // Cari objek OLT yang sesuai dengan IP di server tersebut
-        const targetOlt = targetServer.olts.find(o => o.ip === oltIp);
-        if (!targetOlt) throw new Error('Konfigurasi OLT tidak ditemukan');
+        // === UBAH BAGIAN INI AGAR MEMANCARKAN SOCKET ===
+        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { 
+            oltText = teksHasil; 
+            // PANCARKAN HASIL SEKETIKA KE FRONTEND LEWAT SOCKET!
+            io.emit('realtime_redaman_result', { username, redamanText: teksHasil });
+        });
+        // ===============================================
 
-        // Panggil fungsi scan dari oltService untuk mengambil MAC list pada PON tersebut
-        await scanSemuaOlt([targetOlt], null, async (teksHasil, macList) => {
-            if (macList && Array.isArray(macList)) {
-                foundMacs = macList;
-            }
-        }, pon);
-
-        return { serverKey, oltIp, pon, macs: foundMacs };
-    }, 'SYSTEM_SCAN', targetServer.label);
+        return { username, server: targetServer.label, mac, olt: oltText };
+    }, username, config.servers[serverKey]?.label || 'Unknown');
     
+    await safeCloseMikrotik(api);
     res.json(result);
 });
 
