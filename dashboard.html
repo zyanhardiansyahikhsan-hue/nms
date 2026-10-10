@@ -840,6 +840,35 @@
       }
     });
 
+    // === TAMBAHKAN KODE INI DI SINI (SEBELUM function addConsoleLog) ===
+    socket.on('realtime_redaman_result', (data) => {
+      // Pastikan hasil yang diterima adalah untuk user yang sedang dibuka di modal
+      if (currentDiagUser && data.username.toLowerCase() === currentDiagUser.toLowerCase()) {
+         
+         let redamanText = "Tdk Ditemukan";
+         if(data.redamanText && data.redamanText.includes("Redaman:")) {
+             const match = data.redamanText.match(/Redaman:\s*\*([-\d.]+\s*dBm)\*/);
+             if(match && match[1]) {
+                 redamanText = match[1];
+             }
+         }
+
+         // Update modal SEKETIKA!
+         const diagRxElement = document.getElementById('diag-rx');
+         if (diagRxElement) {
+             diagRxElement.innerHTML = `<span class="text-purple-300 font-bold">${redamanText}</span>`;
+         }
+         
+         // Update tabel utama juga
+         let matchCust = customers.find(c => c.name.toLowerCase() === currentDiagUser.toLowerCase());
+         if(matchCust) {
+             matchCust.rx = redamanText.replace(' dBm', '');
+             renderTable(true);
+         }
+      }
+    });
+    // =================================================================
+    
     function addConsoleLog(type, message) {
       const consoleBox = document.getElementById('console-stream');
       const logEntry = document.createElement('div');
