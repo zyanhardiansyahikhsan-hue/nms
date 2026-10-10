@@ -581,38 +581,69 @@
       renderTable();
     }
 
-    function openDiagnostics(name, node, mac, ip, rx, status) {
-      currentDiagUser = name;
-      currentDiagNode = node;
+    async function openDiagnostics(name, node, mac, ip, rx, status) {
+    currentDiagUser = name;
+    currentDiagNode = node;
 
-      document.getElementById('diag-name').innerText = name;
-      document.getElementById('diag-server').innerText = `Server Node: ${node}`;
-      document.getElementById('diag-mac').innerText = mac;
-      document.getElementById('diag-ip').innerText = ip;
-      document.getElementById('diag-rx').innerText = rx ? `${rx} dBm` : '-19.50 dBm';
+    // Setel tampilan awal saat loading
+    document.getElementById('diag-name').innerText = name;
+    document.getElementById('diag-server').innerText = `Server Node: ${node}`;
+    document.getElementById('diag-mac').innerText = mac;
+    document.getElementById('diag-ip').innerText = ip;
+    document.getElementById('diag-rx').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-slate-500"></i> Membaca OLT...'; // Loading Text
 
-      const diagStatus = document.getElementById('diag-status');
-      const trapBox = document.getElementById('diag-trap-box');
+    const diagStatus = document.getElementById('diag-status');
+    const trapBox = document.getElementById('diag-trap-box');
 
-      if (status === 'ONLINE') {
+    // ... (Bagian IF ELSE untuk status ONLINE/DYING GASP/LOS biarkan sama seperti aslinya) ...
+    if (status === 'ONLINE') {
         diagStatus.innerText = 'ONLINE (NORMAL)';
         diagStatus.className = 'font-bold text-emerald-400';
         trapBox.className = 'p-3.5 rounded-xl border bg-emerald-950/20 border-emerald-800/40 text-xs space-y-1 text-emerald-300 font-mono';
         trapBox.innerHTML = `<div><i class="fa-solid fa-circle-check"></i> Sinyal & Daya Listrik Normal</div><p class="text-[11px] text-emerald-400/80">ONT terhubung sempurna dengan OLT.</p>`;
-      } else if (status === 'DYING_GASP') {
+    } else if (status === 'DYING_GASP') {
         diagStatus.innerText = '⚡ MATI LISTRIK (DYING GASP)';
         diagStatus.className = 'font-bold text-amber-400';
         trapBox.className = 'p-3.5 rounded-xl border bg-amber-950/20 border-amber-800/40 text-xs space-y-1 text-amber-300 font-mono';
         trapBox.innerHTML = `<div><i class="fa-solid fa-bolt"></i> Terverifikasi Dying Gasp (SNMP OID)</div><p class="text-[11px] text-amber-400/80">Listrik rumah mati. Kabel Fiber Optik TIDAK PUTUS.</p>`;
-      } else {
+    } else {
         diagStatus.innerText = '🚨 LOSE KONEKSI (LOS)';
         diagStatus.className = 'font-bold text-rose-400';
         trapBox.className = 'p-3.5 rounded-xl border bg-rose-950/20 border-rose-800/40 text-xs space-y-1 text-rose-300 font-mono';
         trapBox.innerHTML = `<div><i class="fa-solid fa-scissors"></i> Terdeteksi Loss of Signal (LOS)</div><p class="text-[11px] text-rose-400/80">Kabel Drop Core terputus atau ODP bermasalah.</p>`;
-      }
-
-      openModal('diag-modal');
     }
+
+    openModal('diag-modal');
+
+    // === TAMBAHKAN BAGIAN INI UNTUK MENGAMBIL REDAMAN ASLI DARI BACKEND ===
+    if (status === 'ONLINE') {
+        try {
+            // Cari server key (karena API butuh key seperti 'panglejar', bukan label 'Panglejar')
+            let serverKey = node;
+            const resServer = await fetch(`/api/server-olt/${encodeURIComponent(node)}`);
+            const dataServer = await resServer.json();
+            if (dataServer.success) {
+                serverKey = dataServer.serverKey;
+            }
+
+            // Panggil API Cek Redaman
+            const res = await fetch('/api/cek-redaman', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serverKey, username: name })
+            });
+            const data = await res.json();
+            
+            // Tunggu hasilnya (karena masuk sistem antrean)
+            pollCekRedamanResult(data.queueId);
+
+        } catch (err) {
+            document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Gagal Server</span>';
+        }
+    } else {
+         document.getElementById('diag-rx').innerText = 'OFFLINE';
+    }
+}
 
     // Eksekusi Buka Isolir Menggantikan Test Ping
     async function eksekusiBukaIsolir() {
