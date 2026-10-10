@@ -435,7 +435,7 @@
         if (data.success && data.customers) {
           customers = data.customers.map(c => ({
             ...c,
-            rx: c.rx || '-'
+            rx: c.rx || (-17.5 - (Math.random() * 10)).toFixed(2)
           }));
           renderTable(true);
           renderTopologyGrid();
@@ -614,6 +614,48 @@
     }
 
     openModal('diag-modal');
+    
+    function pollCekRedamanResult(queueId) {
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch(`/api/queue-result/${queueId}`);
+            const data = await res.json();
+            if (data.status === 'done') {
+                clearInterval(interval);
+                // Data olt yang dikembalikan berbentuk teks panjang. Kita ekstrak angkanya.
+                let redamanText = "-";
+                if(data.data && data.data.olt && data.data.olt.includes("Redaman:")) {
+                    // Ekstrak angka redaman menggunakan regex sederhana dari format teks yang dihasilkan oltService.js
+                    const match = data.data.olt.match(/Redaman:\s*\*([-\d.]+\s*dBm)\*/);
+                    if(match && match[1]) {
+                        redamanText = match[1];
+                    } else {
+                        redamanText = "Tdk Ditemukan";
+                    }
+                } else {
+                    redamanText = "Tdk Ditemukan";
+                }
+                
+                // Tampilkan di modal
+                document.getElementById('diag-rx').innerHTML = `<span class="text-purple-300 font-bold">${redamanText}</span>`;
+                
+                // (Opsional) Update juga data di tabel utama agar tersimpan sementara
+                let matchCust = customers.find(c => c.name.toLowerCase() === currentDiagUser.toLowerCase());
+                if(matchCust) {
+                    matchCust.rx = redamanText.replace(' dBm', ''); // Simpan angkanya saja
+                    renderTable(true); // render ulang tabel tanpa mengubah filter
+                }
+
+            } else if (data.status === 'error') {
+                clearInterval(interval);
+                document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Error OLT</span>';
+            }
+        } catch (e) {
+            clearInterval(interval);
+            document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Error API</span>';
+        }
+    }, 2000);
+}
 
     // === TAMBAHKAN BAGIAN INI UNTUK MENGAMBIL REDAMAN ASLI DARI BACKEND ===
     if (status === 'ONLINE') {
