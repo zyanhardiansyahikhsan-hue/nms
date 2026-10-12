@@ -203,7 +203,7 @@
 
       <div class="glass-card rounded-2xl overflow-hidden">
         <div class="flex items-center justify-between px-3.5 py-2 border-b border-slate-800 text-[10px] text-slate-500 font-bold">
-          <span>Pelanggan • Server Node</span><span>Redaman</span>
+          <span>Pelanggan • Server Node</span><span>Info & Aksi</span>
         </div>
         <div id="customer-list" class="divide-y divide-slate-800/60"></div>
         <button id="btn-more" onclick="showMore()" class="hidden w-full py-3.5 text-xs font-bold text-cyan-400 border-t border-slate-800 active:bg-slate-800/60">Muat lebih banyak</button>
@@ -292,7 +292,7 @@
       <div class="flex items-center justify-between pt-2 border-t border-slate-800 gap-2">
         <div class="flex items-center gap-2 flex-wrap">
           
-          <!-- Button Cek Redaman (BARU) -->
+          <!-- Button Cek Redaman -->
           <button id="btn-cek-redaman" onclick="eksekusiCekRedaman()" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 hidden">
             <i class="fa-solid fa-satellite-dish"></i> Cek Redaman
           </button>
@@ -307,15 +307,16 @@
             <i class="fa-solid fa-power-off"></i> Reboot ONT
           </button>
           
-          <!-- BUTTON REMOTE PELANGGAN (TAMBAHAN BARU) -->
+          <!-- BUTTON REMOTE PELANGGAN -->
           <button id="btn-remote" onclick="eksekusiRemote()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
             <i class="fa-solid fa-globe"></i> Remote
           </button>
-
         </div>
 
         <button onclick="closeModal('diag-modal')" class="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl font-bold text-xs transition">Tutup</button>
       </div>
+    </div>
+  </div>
 
   <!-- MODAL 2: SYSTEM HEALTH DIAGNOSTICS -->
   <div id="health-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center sm:p-4">
@@ -417,6 +418,29 @@
 
   <div id="toast-container" class="fixed bottom-4 left-3 right-3 mx-auto z-[70] space-y-2 max-w-sm pointer-events-none"></div>
 
+  <!-- ========================================== -->
+  <!-- AUDIO & MODAL ALARM MASSAL (JALUR PUTUS)   -->
+  <!-- ========================================== -->
+  <audio id="alarm-audio" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto" loop></audio>
+
+  <div id="alarm-modal" class="fixed inset-0 bg-rose-950/95 backdrop-blur-md z-[100] hidden flex items-center justify-center p-4 transition-all">
+    <div class="bg-rose-900 border-4 border-rose-500 rounded-3xl max-w-sm w-full p-6 text-center shadow-[0_0_80px_rgba(244,63,94,0.8)] animate-pulse">
+        <i class="fa-solid fa-triangle-exclamation text-7xl text-white mb-4 fa-beat"></i>
+        <h2 class="text-3xl font-black text-white mb-2">CRITICAL ALARM!</h2>
+        <p class="text-rose-200 text-sm mb-4">Terdeteksi <span id="alarm-count" class="font-black text-white text-xl bg-rose-950 px-2 py-1 rounded">0</span> pelanggan OFFLINE beruntun dari:</p>
+        
+        <div id="alarm-node" class="text-xl sm:text-2xl font-extrabold text-white mb-6 bg-rose-950/50 py-3 px-2 rounded-xl border border-rose-500/50 leading-relaxed">OLT TARGET</div>
+        
+        <p class="text-[11px] text-rose-300 mb-6 font-mono bg-rose-950/30 p-2 rounded-lg">
+           Indikasi FO Jalur Utama Putus (LOS) atau Mati Lampu Massal pada OLT.
+        </p>
+        
+        <button onclick="stopAlarm()" class="w-full py-3.5 bg-white hover:bg-slate-200 text-rose-900 font-extrabold rounded-xl shadow-xl active:scale-95 transition text-lg">
+            MATIKAN ALARM
+        </button>
+    </div>
+  </div>
+
   <!-- SOCKET.IO & APPLICATION SCRIPT -->
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
@@ -493,17 +517,22 @@
         const rxNum = parseFloat(c.rx);
         const rxCls = !online ? 'text-slate-600' : (rxNum < -25 ? 'text-orange-400' : 'text-purple-300');
         const name = String(c.name).replace(/</g, '&lt;');
-        return `<button onclick="openDiagByIdx(${i})" class="row-tap w-full text-left flex items-center gap-3 px-3.5 py-3">
+        
+        // Format teks redaman agar rapi jika kosong atau offline
+        const redamanText = (online && c.rx && c.rx !== '-' && c.rx !== 'Tdk Ditemukan') ? `${c.rx} dBm` : '';
+
+        return `<button onclick="openDiagByIdx(${i})" class="row-tap w-full text-left flex items-center gap-3 px-3.5 py-3 hover:bg-slate-800/50 transition border-b border-transparent hover:border-slate-800">
           <span class="w-2.5 h-2.5 rounded-full shrink-0 ${dot}"></span>
           <span class="min-w-0 flex-1">
             <span class="block text-[13px] font-bold text-slate-100 truncate">${name}</span>
             <span class="block text-[11px] text-cyan-400 font-mono truncate">${c.node}</span>
           </span>
-          <span class="text-right shrink-0 font-mono">
-            <span class="block text-[13px] font-bold ${rxCls}">${online ? c.rx : '—'}</span>
-            <span class="block text-[9px] text-slate-500">dBm</span>
+          <span class="text-right shrink-0 flex flex-col items-end justify-center">
+            <span class="block text-[12px] font-bold ${rxCls} font-mono mb-1">${redamanText}</span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 text-cyan-400 border border-slate-700 rounded-md text-[9px] font-bold tracking-wide">
+              CEK DETAIL <i class="fa-solid fa-chevron-right text-[8px]"></i>
+            </span>
           </span>
-          <i class="fa-solid fa-chevron-right text-[10px] text-slate-600"></i>
         </button>`;
       }).join('');
     }
@@ -623,7 +652,7 @@
 
         openModal('diag-modal');
 
-        // LOGIKA BARU: Manual Eksekusi
+        // LOGIKA BARU: Manual Eksekusi Cek Redaman
         if (status === 'ONLINE') {
             document.getElementById('diag-rx').innerHTML = '<span class="text-slate-500 text-[11px]"><i class="fa-solid fa-arrow-down"></i> Klik "Cek Redaman" di bawah</span>';
             
@@ -636,7 +665,7 @@
         } else {
              document.getElementById('diag-rx').innerText = 'OFFLINE';
              const btnCek = document.getElementById('btn-cek-redaman');
-             if(btnCek) btnCek.classList.add('hidden'); // Sembunyikan kalau offline
+             if(btnCek) btnCek.classList.add('hidden'); 
         }
     }
 
@@ -705,7 +734,6 @@
                 // STATUS 3: SELESAI
                 else if (data.status === 'done') {
                     clearInterval(interval);
-                    // Jika Socket Realtime belum menangkap teks karena delay jaringan, extract manual
                     let redamanText = "Tdk Ditemukan";
                     if(data.data && data.data.olt && data.data.olt.includes("Redaman:")) {
                         const match = data.data.olt.match(/Redaman:\s*\*([-\d.]+\s*dBm)\*/);
@@ -734,16 +762,11 @@
 
     // === FUNGSI REMOTE IP PELANGGAN ===
     function eksekusiRemote() {
-        // Ambil IP dari text yang sedang tampil di modal diagnostik
         const ip = document.getElementById('diag-ip').innerText;
-        
-        // Validasi jika IP belum ada, kosong, atau Dynamic
         if (!ip || ip === 'Dynamic' || ip === '-' || ip.includes('Error') || ip === '192.168.0.1') {
             showToast('GAGAL REMOTE', 'IP Address belum terdeteksi atau masih Dynamic', 'rose');
             return;
         }
-
-        // Buka IP pelanggan di tab baru web browser
         window.open(`http://${ip}`, '_blank');
         showToast('MEMBUKA TAB BARU', `Menghubungkan ke http://${ip}`, 'cyan');
     }
@@ -812,7 +835,7 @@
       }, 2000);
     }
 
-    // Eksekusi Reboot ONT / Reset Session PPPoE (BARU)
+    // Eksekusi Reboot ONT / Reset Session PPPoE
     async function eksekusiRebootOnt() {
       if (!currentDiagUser || !currentDiagNode) {
         showToast('ERROR', 'Data pelanggan tidak ditemukan', 'rose');
@@ -885,8 +908,12 @@
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-    // REALTIME TRAP EVENT LISTENER (SOCKET.IO)
+    // ==========================================
+    // SISTEM DETEKSI ALARM PUTUS JALUR (SNMP TRAP BURST)
+    // ==========================================
+    let trapCounters = {};
     const socket = io();
+    
     socket.on('connect', () => {
       addConsoleLog('INFO', 'Terhubung ke NMS Backend Engine UDP:162');
     });
@@ -894,18 +921,63 @@
     socket.on('nms_olt_event', (data) => {
       addConsoleLog(data.type, `${data.oltName} -> ${data.message}`);
       
+      // 1. Update status dot merah/kuning di tabel web
       let match = customers.find(c => c.mac.toLowerCase() === data.macAddress?.toLowerCase());
       if (match) {
         match.status = data.type;
         renderTable(true);
       }
+
+      // 2. LOGIKA ALARM MASSAL PER OLT SPESIFIK
+      if (data.type === 'LOS' || data.type === 'DYING_GASP') {
+          let key = data.oltName + '_' + data.type; 
+          
+          if (!trapCounters[key]) {
+              trapCounters[key] = { count: 0, timer: null };
+          }
+          
+          trapCounters[key].count++; 
+          
+          // TRESHOLD: Jika tembus minimal 8 pelanggan dari OLT ini
+          if (trapCounters[key].count >= 8) {
+              triggerMassOutageAlarm(data.oltName, trapCounters[key].count, data.type);
+              trapCounters[key].count = 0; 
+          }
+
+          // WINDOW TIMER: Reset hitungan setelah 15 detik
+          clearTimeout(trapCounters[key].timer);
+          trapCounters[key].timer = setTimeout(() => {
+              if (trapCounters[key]) trapCounters[key].count = 0;
+          }, 15000);
+      }
     });
+
+    function triggerMassOutageAlarm(oltName, count, type) {
+        let alasan = type === 'DYING_GASP' ? 'MATI LISTRIK (DYING GASP)' : 'KABEL PUTUS (LOS)';
+        
+        document.getElementById('alarm-count').innerText = count;
+        document.getElementById('alarm-node').innerText = `${oltName.toUpperCase()}\n⚠️ ${alasan}`; 
+        document.getElementById('alarm-modal').classList.remove('hidden');
+        
+        const audio = document.getElementById('alarm-audio');
+        if(audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Auto-play diblokir browser, harap klik area web terlebih dahulu."));
+        }
+    }
+
+    function stopAlarm() {
+        document.getElementById('alarm-modal').classList.add('hidden');
+        const audio = document.getElementById('alarm-audio');
+        if(audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+    }
 
     // SOCKET PENDETEKSI HASIL REDAMAN (SOCKET.IO)
     socket.on('realtime_redaman_result', (data) => {
-      // Pastikan hasil yang diterima adalah untuk user yang sedang dibuka di modal
       if (currentDiagUser && data.username.toLowerCase() === currentDiagUser.toLowerCase()) {
-         
          let redamanText = "Tdk Ditemukan";
          if(data.redamanText && data.redamanText.includes("Redaman:")) {
              const match = data.redamanText.match(/Redaman:\s*\*([-\d.]+\s*dBm)\*/);
@@ -914,13 +986,11 @@
              }
          }
 
-         // Update modal SEKETIKA!
          const diagRxElement = document.getElementById('diag-rx');
          if (diagRxElement) {
              diagRxElement.innerHTML = `<span class="text-purple-300 font-bold">${redamanText}</span>`;
          }
          
-         // Update tabel utama juga
          let matchCust = customers.find(c => c.name.toLowerCase() === currentDiagUser.toLowerCase());
          if(matchCust) {
              matchCust.rx = redamanText.replace(' dBm', '');
