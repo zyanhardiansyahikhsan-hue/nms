@@ -290,22 +290,32 @@
       </div>
 
       <div class="flex items-center justify-between pt-2 border-t border-slate-800 gap-2">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          
+          <!-- Button Cek Redaman (BARU) -->
+          <button id="btn-cek-redaman" onclick="eksekusiCekRedaman()" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 hidden">
+            <i class="fa-solid fa-satellite-dish"></i> Cek Redaman
+          </button>
+
           <!-- Button Buka Isolir -->
           <button id="btn-buka-isolir" onclick="eksekusiBukaIsolir()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
             <i class="fa-solid fa-lock-open"></i> Buka Isolir
           </button>
 
-          <!-- Button Reboot ONT (BARU) -->
+          <!-- Button Reboot ONT -->
           <button id="btn-reboot-ont" onclick="eksekusiRebootOnt()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
             <i class="fa-solid fa-power-off"></i> Reboot ONT
           </button>
+          
+          <!-- BUTTON REMOTE PELANGGAN (TAMBAHAN BARU) -->
+          <button id="btn-remote" onclick="eksekusiRemote()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-globe"></i> Remote
+          </button>
+
         </div>
 
         <button onclick="closeModal('diag-modal')" class="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl font-bold text-xs transition">Tutup</button>
       </div>
-    </div>
-  </div>
 
   <!-- MODAL 2: SYSTEM HEALTH DIAGNOSTICS -->
   <div id="health-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center sm:p-4">
@@ -582,110 +592,161 @@
     }
 
     async function openDiagnostics(name, node, mac, ip, rx, status) {
-    currentDiagUser = name;
-    currentDiagNode = node;
+        currentDiagUser = name;
+        currentDiagNode = node;
 
-    // Setel tampilan awal saat loading
-    document.getElementById('diag-name').innerText = name;
-    document.getElementById('diag-server').innerText = `Server Node: ${node}`;
-    document.getElementById('diag-mac').innerText = mac;
-    document.getElementById('diag-ip').innerText = ip;
-    document.getElementById('diag-rx').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-slate-500"></i> Membaca OLT...'; // Loading Text
+        // Setel tampilan awal saat loading
+        document.getElementById('diag-name').innerText = name;
+        document.getElementById('diag-server').innerText = `Server Node: ${node}`;
+        document.getElementById('diag-mac').innerText = mac;
+        document.getElementById('diag-ip').innerText = ip;
 
-    const diagStatus = document.getElementById('diag-status');
-    const trapBox = document.getElementById('diag-trap-box');
+        const diagStatus = document.getElementById('diag-status');
+        const trapBox = document.getElementById('diag-trap-box');
 
-    // ... (Bagian IF ELSE untuk status ONLINE/DYING GASP/LOS biarkan sama seperti aslinya) ...
-    if (status === 'ONLINE') {
-        diagStatus.innerText = 'ONLINE (NORMAL)';
-        diagStatus.className = 'font-bold text-emerald-400';
-        trapBox.className = 'p-3.5 rounded-xl border bg-emerald-950/20 border-emerald-800/40 text-xs space-y-1 text-emerald-300 font-mono';
-        trapBox.innerHTML = `<div><i class="fa-solid fa-circle-check"></i> Sinyal & Daya Listrik Normal</div><p class="text-[11px] text-emerald-400/80">ONT terhubung sempurna dengan OLT.</p>`;
-    } else if (status === 'DYING_GASP') {
-        diagStatus.innerText = '⚡ MATI LISTRIK (DYING GASP)';
-        diagStatus.className = 'font-bold text-amber-400';
-        trapBox.className = 'p-3.5 rounded-xl border bg-amber-950/20 border-amber-800/40 text-xs space-y-1 text-amber-300 font-mono';
-        trapBox.innerHTML = `<div><i class="fa-solid fa-bolt"></i> Terverifikasi Dying Gasp (SNMP OID)</div><p class="text-[11px] text-amber-400/80">Listrik rumah mati. Kabel Fiber Optik TIDAK PUTUS.</p>`;
-    } else {
-        diagStatus.innerText = '🚨 LOSE KONEKSI (LOS)';
-        diagStatus.className = 'font-bold text-rose-400';
-        trapBox.className = 'p-3.5 rounded-xl border bg-rose-950/20 border-rose-800/40 text-xs space-y-1 text-rose-300 font-mono';
-        trapBox.innerHTML = `<div><i class="fa-solid fa-scissors"></i> Terdeteksi Loss of Signal (LOS)</div><p class="text-[11px] text-rose-400/80">Kabel Drop Core terputus atau ODP bermasalah.</p>`;
+        if (status === 'ONLINE') {
+            diagStatus.innerText = 'ONLINE (NORMAL)';
+            diagStatus.className = 'font-bold text-emerald-400';
+            trapBox.className = 'p-3.5 rounded-xl border bg-emerald-950/20 border-emerald-800/40 text-xs space-y-1 text-emerald-300 font-mono';
+            trapBox.innerHTML = `<div><i class="fa-solid fa-circle-check"></i> Sinyal & Daya Listrik Normal</div><p class="text-[11px] text-emerald-400/80">ONT terhubung sempurna dengan OLT.</p>`;
+        } else if (status === 'DYING_GASP') {
+            diagStatus.innerText = '⚡ MATI LISTRIK (DYING GASP)';
+            diagStatus.className = 'font-bold text-amber-400';
+            trapBox.className = 'p-3.5 rounded-xl border bg-amber-950/20 border-amber-800/40 text-xs space-y-1 text-amber-300 font-mono';
+            trapBox.innerHTML = `<div><i class="fa-solid fa-bolt"></i> Terverifikasi Dying Gasp (SNMP OID)</div><p class="text-[11px] text-amber-400/80">Listrik rumah mati. Kabel Fiber Optik TIDAK PUTUS.</p>`;
+        } else {
+            diagStatus.innerText = '🚨 LOSE KONEKSI (LOS)';
+            diagStatus.className = 'font-bold text-rose-400';
+            trapBox.className = 'p-3.5 rounded-xl border bg-rose-950/20 border-rose-800/40 text-xs space-y-1 text-rose-300 font-mono';
+            trapBox.innerHTML = `<div><i class="fa-solid fa-scissors"></i> Terdeteksi Loss of Signal (LOS)</div><p class="text-[11px] text-rose-400/80">Kabel Drop Core terputus atau ODP bermasalah.</p>`;
+        }
+
+        openModal('diag-modal');
+
+        // LOGIKA BARU: Manual Eksekusi
+        if (status === 'ONLINE') {
+            document.getElementById('diag-rx').innerHTML = '<span class="text-slate-500 text-[11px]"><i class="fa-solid fa-arrow-down"></i> Klik "Cek Redaman" di bawah</span>';
+            
+            const btnCek = document.getElementById('btn-cek-redaman');
+            if(btnCek) {
+                btnCek.classList.remove('hidden');
+                btnCek.disabled = false;
+                btnCek.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Cek Redaman';
+            }
+        } else {
+             document.getElementById('diag-rx').innerText = 'OFFLINE';
+             const btnCek = document.getElementById('btn-cek-redaman');
+             if(btnCek) btnCek.classList.add('hidden'); // Sembunyikan kalau offline
+        }
     }
 
-    openModal('diag-modal');
-    
-    function pollCekRedamanResult(queueId) {
-    const interval = setInterval(async () => {
-        try {
-            const res = await fetch(`/api/queue-result/${queueId}`);
-            const data = await res.json();
-            if (data.status === 'done') {
-                clearInterval(interval);
-                // Data olt yang dikembalikan berbentuk teks panjang. Kita ekstrak angkanya.
-                let redamanText = "-";
-                if(data.data && data.data.olt && data.data.olt.includes("Redaman:")) {
-                    // Ekstrak angka redaman menggunakan regex sederhana dari format teks yang dihasilkan oltService.js
-                    const match = data.data.olt.match(/Redaman:\s*\*([-\d.]+\s*dBm)\*/);
-                    if(match && match[1]) {
-                        redamanText = match[1];
-                    } else {
-                        redamanText = "Tdk Ditemukan";
-                    }
-                } else {
-                    redamanText = "Tdk Ditemukan";
-                }
-                
-                // Tampilkan di modal
-                document.getElementById('diag-rx').innerHTML = `<span class="text-purple-300 font-bold">${redamanText}</span>`;
-                
-                // (Opsional) Update juga data di tabel utama agar tersimpan sementara
-                let matchCust = customers.find(c => c.name.toLowerCase() === currentDiagUser.toLowerCase());
-                if(matchCust) {
-                    matchCust.rx = redamanText.replace(' dBm', ''); // Simpan angkanya saja
-                    renderTable(true); // render ulang tabel tanpa mengubah filter
-                }
+    // === FUNGSI EKSEKUSI MANUAL CEK REDAMAN DENGAN QUEUE & NOTIF ===
+    async function eksekusiCekRedaman() {
+        if (!currentDiagUser || !currentDiagNode) return;
 
-            } else if (data.status === 'error') {
-                clearInterval(interval);
-                document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Error OLT</span>';
-            }
-        } catch (e) {
-            clearInterval(interval);
-            document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Error API</span>';
-        }
-    }, 2000);
-}
+        const btn = document.getElementById('btn-cek-redaman');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menghubungkan...';
+        document.getElementById('diag-rx').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-slate-500"></i> Memulai...';
 
-    // === TAMBAHKAN BAGIAN INI UNTUK MENGAMBIL REDAMAN ASLI DARI BACKEND ===
-    if (status === 'ONLINE') {
         try {
-            // Cari server key (karena API butuh key seperti 'panglejar', bukan label 'Panglejar')
-            let serverKey = node;
-            const resServer = await fetch(`/api/server-olt/${encodeURIComponent(node)}`);
+            let serverKey = currentDiagNode;
+            const resServer = await fetch(`/api/server-olt/${encodeURIComponent(currentDiagNode)}`);
             const dataServer = await resServer.json();
-            if (dataServer.success) {
-                serverKey = dataServer.serverKey;
-            }
+            if (dataServer.success) serverKey = dataServer.serverKey;
 
-            // Panggil API Cek Redaman
+            // Tembak API
             const res = await fetch('/api/cek-redaman', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serverKey, username: name })
+                body: JSON.stringify({ serverKey, username: currentDiagUser })
             });
             const data = await res.json();
             
-            // Tunggu hasilnya (karena masuk sistem antrean)
-            pollCekRedamanResult(data.queueId);
-
+            // Masuk Polling Antrean
+            if (data.queueId) {
+                pollCekRedamanResultQueue(data.queueId);
+            }
         } catch (err) {
             document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Gagal Server</span>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Cek Redaman';
         }
-    } else {
-         document.getElementById('diag-rx').innerText = 'OFFLINE';
     }
-}
+
+    function pollCekRedamanResultQueue(queueId) {
+        let hasNotifiedProcessing = false;
+        let lastPosition = 0;
+        
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/queue-result/${queueId}`);
+                const data = await res.json();
+                
+                // STATUS 1: MENGANTRE
+                if (data.status === 'pending') {
+                    if (lastPosition !== data.position) {
+                        showToast('MENGANTRE', `Anda berada di antrian ke-${data.position}. Mohon tunggu.`, 'amber');
+                        lastPosition = data.position;
+                    }
+                    document.getElementById('diag-rx').innerHTML = `<i class="fa-solid fa-hourglass-half text-amber-500"></i> Antrian (${data.position})`;
+                    document.getElementById('btn-cek-redaman').innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Antri (${data.position})...`;
+                } 
+                // STATUS 2: GILIRAN TIBA / SEDANG SCAN
+                else if (data.status === 'processing') {
+                    if (!hasNotifiedProcessing) {
+                        showToast('ANTRIAN SELESAI', 'Otomatis memindai redaman ke OLT!', 'cyan');
+                        hasNotifiedProcessing = true;
+                        
+                        document.getElementById('diag-rx').innerHTML = '<i class="fa-solid fa-satellite-dish fa-beat text-cyan-400"></i> Memindai Turbo...';
+                        document.getElementById('btn-cek-redaman').innerHTML = '<i class="fa-solid fa-satellite-dish fa-beat"></i> Memindai...';
+                    }
+                } 
+                // STATUS 3: SELESAI
+                else if (data.status === 'done') {
+                    clearInterval(interval);
+                    // Jika Socket Realtime belum menangkap teks karena delay jaringan, extract manual
+                    let redamanText = "Tdk Ditemukan";
+                    if(data.data && data.data.olt && data.data.olt.includes("Redaman:")) {
+                        const match = data.data.olt.match(/Redaman:\s*\*([-\d.]+\s*dBm)\*/);
+                        if(match && match[1]) redamanText = match[1];
+                    }
+                    
+                    document.getElementById('diag-rx').innerHTML = `<span class="text-purple-300 font-bold">${redamanText}</span>`;
+                    
+                    const btnCek = document.getElementById('btn-cek-redaman');
+                    btnCek.disabled = false;
+                    btnCek.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Cek Redaman';
+                } 
+                // STATUS 4: ERROR
+                else if (data.status === 'error') {
+                    clearInterval(interval);
+                    document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Error OLT</span>';
+                    const btnCek = document.getElementById('btn-cek-redaman');
+                    btnCek.disabled = false;
+                    btnCek.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Cek Redaman';
+                }
+            } catch (e) {
+                clearInterval(interval);
+            }
+        }, 2000);
+    }
+
+    // === FUNGSI REMOTE IP PELANGGAN ===
+    function eksekusiRemote() {
+        // Ambil IP dari text yang sedang tampil di modal diagnostik
+        const ip = document.getElementById('diag-ip').innerText;
+        
+        // Validasi jika IP belum ada, kosong, atau Dynamic
+        if (!ip || ip === 'Dynamic' || ip === '-' || ip.includes('Error') || ip === '192.168.0.1') {
+            showToast('GAGAL REMOTE', 'IP Address belum terdeteksi atau masih Dynamic', 'rose');
+            return;
+        }
+
+        // Buka IP pelanggan di tab baru web browser
+        window.open(`http://${ip}`, '_blank');
+        showToast('MEMBUKA TAB BARU', `Menghubungkan ke http://${ip}`, 'cyan');
+    }
 
     // Eksekusi Buka Isolir Menggantikan Test Ping
     async function eksekusiBukaIsolir() {
@@ -840,7 +901,7 @@
       }
     });
 
-    // === TAMBAHKAN KODE INI DI SINI (SEBELUM function addConsoleLog) ===
+    // SOCKET PENDETEKSI HASIL REDAMAN (SOCKET.IO)
     socket.on('realtime_redaman_result', (data) => {
       // Pastikan hasil yang diterima adalah untuk user yang sedang dibuka di modal
       if (currentDiagUser && data.username.toLowerCase() === currentDiagUser.toLowerCase()) {
@@ -867,7 +928,6 @@
          }
       }
     });
-    // =================================================================
     
     function addConsoleLog(type, message) {
       const consoleBox = document.getElementById('console-stream');
