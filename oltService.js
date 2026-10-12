@@ -6,7 +6,7 @@ const puppeteer = require('puppeteer');
 // ==========================================
 // 1. HSAirpo API (Panglejar & Sukamelang)
 // ==========================================
-async function cekRedamanHSAirpoAPI(oltConfig, mac) {
+async function cekRedamanHSAirpoAPI(oltConfig, mac, control = {}) {
     console.log(`\n🔍 [${oltConfig.label}] Mulai cek (API)...`);
     try {
         const searchMac = mac.substring(0, 16);
@@ -18,7 +18,7 @@ async function cekRedamanHSAirpoAPI(oltConfig, mac) {
         const loginRes = await axios.post(
             `http://${oltConfig.ip}:${oltConfig.port}/userlogin?form=login`,
             { method: "set", param: { name: username, key, value, captcha_v: " ", captcha_f: " " } },
-            { headers: { 'Content-Type': 'application/json;charset=UTF-8', 'x-token': 'null' }, timeout: 10000 }
+            { headers: { 'Content-Type': 'application/json;charset=UTF-8', 'x-token': 'null' }, timeout: 10000, signal: control.signal }
         );
         if (loginRes.data.code !== 1) throw new Error(`Login gagal: ${loginRes.data.message}`);
         
@@ -26,9 +26,10 @@ async function cekRedamanHSAirpoAPI(oltConfig, mac) {
         const totalPon = oltConfig.total_pon || 16;
 
         for (let port = 1; port <= totalPon; port++) {
+            if (control.cancelled) throw new Error('Scan dibatalkan karena OLT lain sudah menemukan MAC');
             const res = await axios.get(
                 `http://${oltConfig.ip}:${oltConfig.port}/onu_allow_list?port_id=${port}`,
-                { headers: { 'x-token': token }, timeout: 5000 }
+                { headers: { 'x-token': token }, timeout: 5000, signal: control.signal }
             );
             
             const onuList = res.data.data || [];
@@ -52,7 +53,7 @@ async function cekRedamanHSAirpoAPI(oltConfig, mac) {
 // ==========================================
 // 2. HSAirpo CIBAROLA (Axios API) - FIXED MAC 12 CHAR
 // ==========================================
-async function cekRedamanHSAirpoCibarola(oltConfig, mac) {
+async function cekRedamanHSAirpoCibarola(oltConfig, mac, control = {}) {
     console.log(`\n🔍 [${oltConfig.label}] Mulai cek (Cibarola API)...`);
     try {
         const cleanTargetMac = mac.replace(/[:.-]/g, '').toLowerCase();
@@ -62,7 +63,7 @@ async function cekRedamanHSAirpoCibarola(oltConfig, mac) {
         const loginRes = await axios.post(
             `http://${oltConfig.ip}:${oltConfig.port}/login/Auth`,
             { userName: oltConfig.user || 'admin', password: passwordBase64 },
-            { headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' }, timeout: 10000 }
+            { headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' }, timeout: 10000, signal: control.signal }
         );
         
         if (loginRes.data.errCode !== 'success') throw new Error('Login gagal');
@@ -72,10 +73,11 @@ async function cekRedamanHSAirpoCibarola(oltConfig, mac) {
         const totalPon = oltConfig.total_pon || 4;
         
         for (let i = 1; i <= totalPon; i++) {
+            if (control.cancelled) throw new Error('Scan dibatalkan karena OLT lain sudah menemukan MAC');
             const ponPort = `pon${i}`;
             const opticalRes = await axios.get(
                 `http://${oltConfig.ip}:${oltConfig.port}/goform/getPortOnuOptical?${Math.random()}&PonPortName=${ponPort}`,
-                { headers: { 'Cookie': sessionCookie, 'X-Requested-With': 'XMLHttpRequest' }, timeout: 15000 }
+                { headers: { 'Cookie': sessionCookie, 'X-Requested-With': 'XMLHttpRequest' }, timeout: 15000, signal: control.signal }
             );
             
             let jsonData = opticalRes.data;
@@ -108,20 +110,28 @@ async function cekRedamanHSAirpoCibarola(oltConfig, mac) {
 // ==========================================
 // 3. Hioso (Puppeteer) - FAST MODE DENGAN BLOCKER
 // ==========================================
-async function cekRedamanHioso(oltConfig, mac) {
+async function cekRedamanHioso(oltConfig, mac, control = {}) {
     let searchMac = mac.substring(0, 16);
     if (oltConfig.label.includes('Cibarola') || oltConfig.label.includes('8Pon')) searchMac = mac.substring(0, 15);
     
     console.log(`\n🔍 [${oltConfig.label}] Mulai cek (Puppeteer Fast Mode)...`);
     console.log(`MAC dicari: ${searchMac} (Panjang: ${searchMac.length})`);
     
-    const browser = await puppeteer.launch({
+    let browser = null;
+    control.cancel = async () => {
+        control.cancelled = true;
+        if (browser) { try { await browser.close(); } catch (e) {} }
+    };
+
+    const browserLaunch = puppeteer.launch({
         headless: 'new',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     });
+    browser = await browserLaunch;
     
     try {
         const page = await browser.newPage();
+        const ensureActive = () => { if (control.cancelled) throw new Error('Scan dibatalkan karena OLT lain sudah menemukan MAC'); };
         page.setDefaultTimeout(20000); 
         page.setDefaultNavigationTimeout(20000);
         
@@ -139,6 +149,7 @@ async function cekRedamanHioso(oltConfig, mac) {
         const user = oltConfig.user || 'admin';
         const pass = oltConfig.pass || 'admin';
         
+        ensureActive();
         await page.authenticate({ username: user, password: pass });
         await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
         console.log(`   ✅ HTTP Basic Auth sukses`);
@@ -187,6 +198,7 @@ async function cekRedamanHioso(oltConfig, mac) {
                 await new Promise(r => setTimeout(r, 2000));
             } catch (err) {}
 
+            ensureActive();
             const rxPowerResult = await mainFrame.evaluate((macToFind) => {
                 const cleanTarget = macToFind.replace(/[:.-]/g, '').toLowerCase();
                 const rows = Array.from(document.querySelectorAll('table tr'));
@@ -226,6 +238,7 @@ async function cekRedamanHioso(oltConfig, mac) {
             
             try { await targetFrame.waitForSelector('table tr', { timeout: 15000 }); } catch (err) {}
             
+            ensureActive();
             const rxPowerResult = await targetFrame.evaluate((macToFind) => {
                 const cleanTarget = macToFind.replace(/[:-]/g, '').toLowerCase();
                 const rows = Array.from(document.querySelectorAll('table tr'));
@@ -263,14 +276,16 @@ async function cekRedamanHioso(oltConfig, mac) {
 const MAX_RETRY_PER_OLT = 2;
 const RETRY_DELAY_MS = 1500;
 
-async function cekDenganRetry(checkerFn, oltConfig, mac) {
+async function cekDenganRetry(checkerFn, oltConfig, mac, control = {}) {
     let lastError = null;
     for (let attempt = 1; attempt <= MAX_RETRY_PER_OLT + 1; attempt++) {
-        const hasil = await checkerFn(oltConfig, mac);
+        if (control.cancelled) return null;
+        const hasil = await checkerFn(oltConfig, mac, control);
         if (hasil === null) return null; 
         if (!hasil.error) return hasil;
         
         lastError = hasil.error;
+        if (control.cancelled) return null;
         if (attempt <= MAX_RETRY_PER_OLT) {
             await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
         }
@@ -283,18 +298,112 @@ async function cekDenganRetry(checkerFn, oltConfig, mac) {
 // ==========================================
 async function scanSemuaOlt(oltList, mac, onFound) {
     console.log(`\n========================================`);
-    console.log(`🚀 MULAI SCAN ${oltList.length} OLT (BERURUTAN - AUTO STOP)...`);
+    console.log(`🚀 MULAI SCAN ${oltList.length} OLT...`);
     console.log(`========================================`);
-    
+
+    // CIBAROLA & SUKAMELANG: semua OLT dijalankan BERSAMAAN.
+    // Begitu salah satu OLT menemukan redaman, hasil LANGSUNG dikirim
+    // tanpa menunggu OLT lain selesai. Scan OLT lain dibatalkan.
+    const fastParallelServer = oltList.some(olt =>
+        String(olt.label || '').toLowerCase().includes('cibarola')
+    ) || oltList.some(olt =>
+        String(olt.label || '').toLowerCase().includes('sukamelang')
+    );
+
+    if (fastParallelServer && oltList.length >= 2) {
+        const modeName = oltList.some(olt => String(olt.label || '').toLowerCase().includes('cibarola'))
+            ? 'Cibarola'
+            : 'Sukamelang';
+        console.log(`⚡ Mode ${modeName}: scan paralel + AUTO CANCEL saat ketemu`);
+
+        const controls = new Map();
+        let winner = false;
+        let remaining = oltList.length;
+
+        await new Promise((resolve) => {
+            const finishIfNeeded = () => {
+                remaining--;
+                if (remaining <= 0 || winner) resolve();
+            };
+
+            oltList.forEach((olt) => {
+                const control = { cancelled: false, cancel: null };
+                controls.set(olt, control);
+
+                (async () => {
+                    console.log(`\n➡️ Memulai Target: ${olt.label}`);
+                    try {
+                        let checkerFn;
+                        if (olt.type === 'HSAirpo') {
+                            checkerFn = olt.method === 'cibarola'
+                                ? cekRedamanHSAirpoCibarola
+                                : cekRedamanHSAirpoAPI;
+                        } else if (olt.type === 'Hioso') {
+                            checkerFn = cekRedamanHioso;
+                        } else {
+                            console.log(`   ⚠️ Tipe OLT tidak dikenal: ${olt.type}`);
+                            finishIfNeeded();
+                            return;
+                        }
+
+                        const hasil = await cekDenganRetry(checkerFn, olt, mac, control);
+
+                        if (hasil && !hasil.error && !control.cancelled && !winner) {
+                            winner = true;
+                            console.log(`\n✅ KETEMU di ${hasil.olt_name}!`);
+                            console.log(`   📉 Redaman: ${hasil.redaman}`);
+
+                            // KIRIM SECEPATNYA. Jangan tunggu OLT lain.
+                            const teksHasil = `\n✅ *${hasil.olt_name}*\n   📉 Redaman: *${hasil.redaman}*\n   📡 Status: ${hasil.status}`;
+                            try {
+                                await onFound(teksHasil);
+                            } catch (err) {
+                                console.error(`   ❌ Gagal mengirim hasil: ${err.message}`);
+                            }
+
+                            // Setelah hasil terkirim, batalkan semua OLT lain.
+                            for (const [otherOlt, otherControl] of controls.entries()) {
+                                if (otherOlt !== olt && !otherControl.cancelled) {
+                                    otherControl.cancelled = true;
+                                    console.log(`🛑 Membatalkan scan: ${otherOlt.label}`);
+                                    if (typeof otherControl.cancel === 'function') {
+                                        try { await otherControl.cancel(); } catch (e) {}
+                                    }
+                                }
+                            }
+                            resolve();
+                            return;
+                        }
+                    } catch (err) {
+                        if (!control.cancelled) {
+                            console.error(`   ❌ [${olt.label}] Error sistem: ${err.message}`);
+                        }
+                    } finally {
+                        finishIfNeeded();
+                    }
+                })();
+            });
+        });
+
+        console.log(winner
+            ? `\n✅ ${modeName} selesai: hasil sudah dikirim, OLT lain dibatalkan.`
+            : `\n❌ Tidak ketemu di OLT manapun.`
+        );
+        console.log(`========================================\n`);
+        return winner;
+    }
+
+    // SERVER LAIN: tetap sequential seperti perilaku sebelumnya.
+    console.log(`🔄 Mode Sequential: scan OLT satu per satu`);
+
     let foundResult = null;
 
-    // Loop akan mengecek OLT satu per satu sesuai urutan di config.js
     for (const olt of oltList) {
         console.log(`\n➡️ Memeriksa Target: ${olt.label}`);
-        
+
         try {
             let hasil = null;
-            
+
             if (olt.type === 'HSAirpo') {
                 hasil = olt.method === 'cibarola'
                     ? await cekDenganRetry(cekRedamanHSAirpoCibarola, olt, mac)
@@ -302,25 +411,24 @@ async function scanSemuaOlt(oltList, mac, onFound) {
             } else if (olt.type === 'Hioso') {
                 hasil = await cekDenganRetry(cekRedamanHioso, olt, mac);
             }
-            
-            // JIKA REDAMAN KETEMU DI OLT INI
+
             if (hasil && !hasil.error) {
                 foundResult = hasil;
-                
+
                 console.log(`\n✅ KETEMU di ${hasil.olt_name}!`);
                 console.log(`   📉 Redaman: ${hasil.redaman}`);
-                
+
                 const teksHasil = `\n✅ *${hasil.olt_name}*\n   📉 Redaman: *${hasil.redaman}*\n   📡 Status: ${hasil.status}`;
-                await onFound(teksHasil); 
-                
-                // HENTIKAN LOOP! OLT selanjutnya tidak akan di-scan.
-                break; 
+                await onFound(teksHasil);
+
+                // Server selain Cibarola tetap auto-stop.
+                break;
             }
         } catch (err) {
             console.error(`   ❌ [${olt.label}] Error sistem: ${err.message}`);
         }
     }
-    
+
     if (!foundResult) {
         console.log(`\n❌ Tidak ketemu di OLT manapun.`);
         console.log(`========================================\n`);
