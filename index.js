@@ -257,34 +257,39 @@ let isProcessingQueue = false;
 let currentTask = null;
 const queueResults = new Map();
 
+// 1. UPDATE: Semua request sekarang wajib masuk antrean agar tidak membuat HTTP request hang
 async function enqueueTask(taskFn, username, serverLabel) {
     const queueId = Date.now() + Math.random().toString(36).substr(2, 9);
-    if (isProcessingQueue) {
-        const position = requestQueue.length + 1;
-        requestQueue.push({ execute: taskFn, username, server: serverLabel, queueId });
-        queueResults.set(queueId, { status: 'pending', position });
-        return { queued: true, position, queueId, estimatedWait: position * 90 };
-    } else {
+    const position = requestQueue.length + 1;
+    
+    requestQueue.push({ execute: taskFn, username, server: serverLabel, queueId });
+    queueResults.set(queueId, { status: 'pending', position });
+    
+    // Mulai proses background jika queue sedang kosong
+    if (!isProcessingQueue) {
         isProcessingQueue = true;
-        currentTask = { username, server: serverLabel };
-        try {
-            const result = await taskFn();
-            queueResults.set(queueId, { status: 'done', data: result });
-            return { success: true, data: result, queueId };
-        } catch (err) {
-            queueResults.set(queueId, { status: 'error', error: err.message });
-            return { success: false, error: err.message, queueId };
-        } finally {
-            currentTask = null;
-            processNextInQueue();
-        }
+        setTimeout(processNextInQueue, 0);
     }
+    
+    // Selalu kembalikan respon instan agar frontend bisa mulai memantau antrean
+    return { queued: true, position, queueId, estimatedWait: position * 90 };
 }
 
+// 2. UPDATE: Tambahkan status 'processing' saat giliran tiba dan update urutan sisa antrean
 async function processNextInQueue() {
     if (requestQueue.length > 0) {
         const next = requestQueue.shift();
         currentTask = { username: next.username, server: next.server };
+        
+        // Tandai bahwa antrean ini sudah mulai dieksekusi (processing)
+        queueResults.set(next.queueId, { status: 'processing' });
+        
+        // Update sisa posisi antrean lainnya
+        requestQueue.forEach((task, index) => {
+            const res = queueResults.get(task.queueId);
+            if (res && res.status === 'pending') res.position = index + 1;
+        });
+
         try {
             const result = await next.execute();
             queueResults.set(next.queueId, { status: 'done', data: result });
@@ -292,23 +297,21 @@ async function processNextInQueue() {
             queueResults.set(next.queueId, { status: 'error', error: err.message });
         } finally {
             currentTask = null;
-            processNextInQueue();
+            processNextInQueue(); // Lanjut ke antrean berikutnya
         }
     } else {
         isProcessingQueue = false;
     }
 }
 
-app.get('/api/servers', (req, res) => {
-    const servers = Object.keys(config.servers).map(key => ({ key, label: config.servers[key].label }));
-    res.json({ servers });
-});
-
+// 3. UPDATE: API Queue memunculkan status 'processing' ke web
 app.get('/api/queue-result/:queueId', (req, res) => {
     const { queueId } = req.params;
     const result = queueResults.get(queueId);
+    
     if (!result) return res.json({ status: 'not_found' });
     if (result.status === 'pending') return res.json({ status: 'pending', position: result.position });
+    if (result.status === 'processing') return res.json({ status: 'processing' }); // Status Baru!
     if (result.status === 'done') { queueResults.delete(queueId); return res.json({ status: 'done', success: true, data: result.data }); }
     if (result.status === 'error') { queueResults.delete(queueId); return res.json({ status: 'error', success: false, error: result.error }); }
 });
