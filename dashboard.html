@@ -82,6 +82,18 @@
     @media (max-width: 640px) { input, select { font-size: 16px !important; } }
     .no-sb { scrollbar-width: none; } .no-sb::-webkit-scrollbar { display: none; }
     .row-tap:active { background: rgba(30, 41, 59, 0.7); }
+
+    /* ========================================== */
+    /* ANIMASI KHUSUS KOTAK DAYA OPTIK RX         */
+    /* ========================================== */
+    .rx-box-idle { border-color: rgba(56, 189, 248, 0.8) !important; box-shadow: 0 0 15px rgba(56, 189, 248, 0.2) inset, 0 0 10px rgba(56, 189, 248, 0.4) !important; animation: pulseRxIdle 2s infinite; }
+    .rx-box-loading { border-color: rgba(245, 158, 11, 0.8) !important; box-shadow: 0 0 15px rgba(245, 158, 11, 0.2) inset, 0 0 10px rgba(245, 158, 11, 0.4) !important; animation: pulseRxLoading 1.5s infinite; background-color: rgba(245, 158, 11, 0.05); }
+    .rx-box-scanning { border-color: rgba(0, 240, 255, 0.9) !important; box-shadow: 0 0 20px rgba(0, 240, 255, 0.3) inset, 0 0 15px rgba(0, 240, 255, 0.5) !important; animation: pulseRxScanning 0.8s infinite; background-color: rgba(0, 240, 255, 0.1); }
+    .rx-box-done { border-color: rgba(168, 85, 247, 0.8) !important; background-color: rgba(168, 85, 247, 0.15); box-shadow: 0 0 15px rgba(168, 85, 247, 0.2) inset !important; }
+
+    @keyframes pulseRxIdle { 0%, 100% { border-color: rgba(56, 189, 248, 0.8) !important; } 50% { border-color: rgba(56, 189, 248, 0.3) !important; box-shadow: none !important; } }
+    @keyframes pulseRxLoading { 0%, 100% { border-color: rgba(245, 158, 11, 0.8) !important; } 50% { border-color: rgba(245, 158, 11, 0.3) !important; box-shadow: none !important; } }
+    @keyframes pulseRxScanning { 0%, 100% { border-color: rgba(0, 240, 255, 0.9) !important; } 50% { border-color: rgba(0, 240, 255, 0.4) !important; transform: scale(1.02); } }
   </style>
 </head>
 
@@ -118,43 +130,30 @@
       <section>
         <div class="text-[11px] font-bold text-slate-500 mb-2">Ringkasan Jaringan</div>
         <div class="grid grid-cols-2 gap-2">
-      <div class="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3">
-        <div class="text-[10px] font-bold text-slate-400">Total Pelanggan</div>
-        <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-total" class="text-xl font-extrabold font-mono text-blue-400">0</span></div>
-        <div class="mt-1 text-[10px] text-slate-500 leading-tight">User PPPoE • MikroTik Sync Active</div>
-      </div>
-      <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
-        <div class="text-[10px] font-bold text-slate-400">Online Normal</div>
-        <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-online" class="text-xl font-extrabold font-mono text-emerald-400">0</span><span id="metric-online-pct" class="text-[11px] text-emerald-500">0%</span></div>
-        <div class="mt-1 text-[10px] text-slate-500 leading-tight">Tautan Optik Stabil</div>
-      </div>
-      <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
-        <div class="text-[10px] font-bold text-slate-400">⚡ Mati Listrik</div>
-        <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-dying" class="text-xl font-extrabold font-mono text-amber-400">0</span></div>
-        <div class="mt-1 text-[10px] text-slate-500 leading-tight">Dying Gasp • PLN Off (FO Aman)</div>
-      </div>
-      <div class="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3">
-        <div class="text-[10px] font-bold text-slate-400">🚨 Lose Koneksi</div>
-        <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-los" class="text-xl font-extrabold font-mono text-rose-400">0</span></div>
-        <div class="mt-1 text-[10px] text-slate-500 leading-tight">LOS / Off • Kabel Optik Putus</div>
-      </div>
-      <div class="rounded-xl border border-orange-500/30 bg-orange-500/5 p-3">
-        <div class="text-[10px] font-bold text-slate-400">⚠️ Redaman High</div>
-        <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-high-rx" class="text-xl font-extrabold font-mono text-orange-400">0</span><span class="text-[10px] text-slate-400">&gt; -25 dBm</span></div>
-        <div class="mt-1 text-[10px] text-slate-500 leading-tight">Perlu Bending Test</div>
-      </div>
-      <div class="rounded-xl border border-purple-500/30 bg-purple-500/5 p-3">
-        <div class="text-[10px] font-bold text-slate-400">Rata-rata Rx</div>
-        <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-rx" class="text-xl font-extrabold font-mono text-purple-400">-</span><span class="text-[10px] text-slate-400">dBm</span></div>
-        <div class="mt-1 text-[10px] text-slate-500 leading-tight">Target Ideal: -19 dBm</div>
-      </div>
+          <!-- CARD 1 -->
+          <div class="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3">
+            <div class="text-[10px] font-bold text-slate-400">Total Pelanggan</div>
+            <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-total" class="text-xl font-extrabold font-mono text-blue-400">0</span></div>
+            <div class="mt-1 text-[10px] text-slate-500 leading-tight">User PPPoE • MikroTik Sync</div>
+          </div>
+          <!-- CARD 2 -->
+          <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+            <div class="text-[10px] font-bold text-slate-400">Online Normal</div>
+            <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-online" class="text-xl font-extrabold font-mono text-emerald-400">0</span><span id="metric-online-pct" class="text-[11px] text-emerald-500">0%</span></div>
+            <div class="mt-1 text-[10px] text-slate-500 leading-tight">Tautan Optik Stabil</div>
+          </div>
+          <!-- CARD 3 (LEBAR PENUH) -->
+          <div class="col-span-2 rounded-xl border border-rose-500/30 bg-rose-500/5 p-3">
+            <div class="text-[10px] font-bold text-slate-400">🚨 Offline / Lose Koneksi</div>
+            <div class="mt-1 flex items-baseline gap-1.5"><span id="metric-los" class="text-xl font-extrabold font-mono text-rose-400">0</span></div>
+            <div class="mt-1 text-[10px] text-slate-500 leading-tight">LOS / ODP Bermasalah / Adaptor Router Dicabut</div>
+          </div>
         </div>
       </section>
 
       <section class="space-y-1.5">
         <div class="text-[11px] font-bold text-slate-500 mb-2">Menu</div>
         <button id="tab-btn-list" onclick="switchTab('list')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left"><i class="fa-solid fa-users w-5 text-center"></i><span class="flex-1">Daftar Pelanggan</span></button>
-        <button id="tab-btn-topology" onclick="switchTab('topology')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left"><i class="fa-solid fa-sitemap w-5 text-center"></i><span class="flex-1">Topologi PON Port</span></button>
         <button id="tab-btn-console" onclick="switchTab('console')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left"><i class="fa-solid fa-terminal w-5 text-center"></i><span class="flex-1">Live Trap Feed</span><span id="badge-trap-count" class="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded-full font-mono">0</span></button>
       </section>
 
@@ -191,7 +190,6 @@
       <div class="flex gap-2 overflow-x-auto no-sb -mx-3 px-3">
         <button onclick="setFilter('ALL')" id="flt-all" class="chip">Semua <span id="cnt-all">0</span></button>
         <button onclick="setFilter('ONLINE')" id="flt-online" class="chip">Online <span id="cnt-online">0</span></button>
-        <button onclick="setFilter('DYING_GASP')" id="flt-dying" class="chip">Mati Listrik <span id="cnt-dying">0</span></button>
         <button onclick="setFilter('LOS')" id="flt-los" class="chip">Offline/LOS <span id="cnt-los">0</span></button>
         <button onclick="resetPonFilter()" id="flt-pon-reset" class="chip hidden !bg-rose-500/15 !text-rose-400 !border-rose-500/40"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>Reset PON</button>
       </div>
@@ -210,19 +208,7 @@
       </div>
     </div>
 
-    <!-- VIEW 2: TOPOLOGY PON PORT VISUALIZER -->
-    <div id="view-topology" class="hidden space-y-4">
-      <div class="glass-card rounded-2xl p-3.5">
-        <h2 class="text-xs font-bold text-slate-200 mb-3 flex items-center gap-2 border-b border-slate-800 pb-3">
-          <i class="fa-solid fa-sitemap text-purple-400 text-base"></i> Topologi PON & Cluster Server
-        </h2>
-        <div id="topology-grid-container" class="grid grid-cols-1 gap-3">
-          <!-- Populated dynamically -->
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 3: LIVE SNMP TRAP STREAM -->
+    <!-- VIEW 2: LIVE SNMP TRAP STREAM -->
     <div id="view-console" class="hidden space-y-4">
       <div class="glass-card rounded-2xl p-3 font-mono text-xs">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3.5 mb-3">
@@ -275,10 +261,15 @@
           <span class="text-slate-500 block text-[10px]">IP ADDRESS</span>
           <span id="diag-ip" class="font-bold text-slate-200">192.168.0.1</span>
         </div>
-        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+        
+        <!-- ========================================== -->
+        <!-- KOTAK ANIMASI DAYA OPTIK RX                -->
+        <!-- ========================================== -->
+        <div id="box-rx" class="bg-slate-950 p-3 rounded-xl border border-slate-800 transition-all duration-300">
           <span class="text-slate-500 block text-[10px]">DAYA OPTIK RX</span>
-          <span id="diag-rx" class="font-bold text-purple-300">-19.50 dBm</span>
+          <span id="diag-rx" class="font-bold text-purple-300 mt-1 block">-19.50 dBm</span>
         </div>
+        
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <span class="text-slate-500 block text-[10px]">STATUS TAUTAN</span>
           <span id="diag-status" class="font-bold text-emerald-400">ONLINE</span>
@@ -483,6 +474,7 @@
     let shown = PAGE;
     let viewList = [];
 
+    // FUNGSI RENDER TABEL (MENDUKUNG TOMBOL "CEK DETAIL >")
     function renderTable(keep) {
       if (!keep) shown = PAGE;
       renderMetrics();
@@ -493,8 +485,7 @@
       viewList = customers.filter(c => {
         if (nodeSel !== 'ALL' && !c.node.toLowerCase().includes(nodeSel.toLowerCase())) return false;
         if (currentFilter === 'ONLINE' && c.status !== 'ONLINE') return false;
-        if (currentFilter === 'DYING_GASP' && c.status !== 'DYING_GASP') return false;
-        if (currentFilter === 'LOS' && c.status !== 'LOS' && c.status !== 'OFFLINE') return false;
+        if (currentFilter === 'LOS' && c.status === 'ONLINE') return false; // Tab Offline tampilkan semua yang bukan Online
         if (currentPonMacs !== null) {
           const m = c.mac.replace(/[:-]/g, '').toLowerCase();
           if (!currentPonMacs.some(x => x.replace(/[:-]/g, '').toLowerCase() === m)) return false;
@@ -513,12 +504,12 @@
 
       box.innerHTML = viewList.slice(0, shown).map((c, i) => {
         const online = c.status === 'ONLINE';
-        const dot = online ? 'bg-emerald-500' : (c.status === 'DYING_GASP' ? 'bg-amber-500' : 'bg-rose-500');
+        const dot = online ? 'bg-emerald-500' : 'bg-rose-500';
         const rxNum = parseFloat(c.rx);
         const rxCls = !online ? 'text-slate-600' : (rxNum < -25 ? 'text-orange-400' : 'text-purple-300');
         const name = String(c.name).replace(/</g, '&lt;');
         
-        // Format teks redaman agar rapi jika kosong atau offline
+        // Format teks redaman
         const redamanText = (online && c.rx && c.rx !== '-' && c.rx !== 'Tdk Ditemukan') ? `${c.rx} dBm` : '';
 
         return `<button onclick="openDiagByIdx(${i})" class="row-tap w-full text-left flex items-center gap-3 px-3.5 py-3 hover:bg-slate-800/50 transition border-b border-transparent hover:border-slate-800">
@@ -553,23 +544,16 @@
     function renderMetrics() {
       const total = customers.length;
       const online = customers.filter(c => c.status === 'ONLINE').length;
-      const dying = customers.filter(c => c.status === 'DYING_GASP').length;
-      const los = customers.filter(c => c.status === 'LOS' || c.status === 'OFFLINE').length;
-      const highRx = customers.filter(c => c.status === 'ONLINE' && parseFloat(c.rx) < -25).length;
-      const rxs = customers.filter(c => c.status === 'ONLINE').map(c => parseFloat(c.rx)).filter(n => !isNaN(n));
-      document.getElementById('metric-rx').innerText = rxs.length ? (rxs.reduce((a, b) => a + b, 0) / rxs.length).toFixed(2) : '-';
+      const los = customers.filter(c => c.status !== 'ONLINE').length; 
       const onlinePct = total > 0 ? ((online / total) * 100).toFixed(0) : 0;
 
       document.getElementById('metric-total').innerText = total;
       document.getElementById('metric-online').innerText = online;
       document.getElementById('metric-online-pct').innerText = `${onlinePct}%`;
-      document.getElementById('metric-dying').innerText = dying;
       document.getElementById('metric-los').innerText = los;
-      document.getElementById('metric-high-rx').innerText = highRx;
 
       document.getElementById('cnt-all').innerText = total;
       document.getElementById('cnt-online').innerText = online;
-      document.getElementById('cnt-dying').innerText = dying;
       document.getElementById('cnt-los').innerText = los;
     }
 
@@ -585,7 +569,7 @@
         
         let itemsHtml = '';
         list.slice(0, 5).forEach(c => {
-          let dot = c.status === 'ONLINE' ? 'bg-emerald-500' : (c.status === 'DYING_GASP' ? 'bg-amber-500' : 'bg-rose-500');
+          let dot = c.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-rose-500';
           itemsHtml += `<div class="flex items-center justify-between py-1 border-b border-slate-800/50 text-xs font-mono">
             <span class="text-slate-200 font-bold">${c.name}</span>
             <span class="w-2.5 h-2.5 rounded-full ${dot}"></span>
@@ -605,7 +589,7 @@
 
     function setFilter(flt) {
       currentFilter = flt;
-      const ids = { ALL: 'all', ONLINE: 'online', DYING_GASP: 'dying', LOS: 'los' };
+      const ids = { ALL: 'all', ONLINE: 'online', LOS: 'los' };
       Object.values(ids).forEach(id => document.getElementById(`flt-${id}`).classList.remove('on'));
       document.getElementById(`flt-${ids[flt]}`).classList.add('on');
       renderTable();
@@ -632,29 +616,30 @@
 
         const diagStatus = document.getElementById('diag-status');
         const trapBox = document.getElementById('diag-trap-box');
+        
+        // Reset animasi kotak RX
+        const boxRx = document.getElementById('box-rx');
+        boxRx.className = 'bg-slate-950 p-3 rounded-xl border border-slate-800 transition-all duration-300'; 
 
         if (status === 'ONLINE') {
             diagStatus.innerText = 'ONLINE (NORMAL)';
             diagStatus.className = 'font-bold text-emerald-400';
             trapBox.className = 'p-3.5 rounded-xl border bg-emerald-950/20 border-emerald-800/40 text-xs space-y-1 text-emerald-300 font-mono';
             trapBox.innerHTML = `<div><i class="fa-solid fa-circle-check"></i> Sinyal & Daya Listrik Normal</div><p class="text-[11px] text-emerald-400/80">ONT terhubung sempurna dengan OLT.</p>`;
-        } else if (status === 'DYING_GASP') {
-            diagStatus.innerText = '⚡ MATI LISTRIK (DYING GASP)';
-            diagStatus.className = 'font-bold text-amber-400';
-            trapBox.className = 'p-3.5 rounded-xl border bg-amber-950/20 border-amber-800/40 text-xs space-y-1 text-amber-300 font-mono';
-            trapBox.innerHTML = `<div><i class="fa-solid fa-bolt"></i> Terverifikasi Dying Gasp (SNMP OID)</div><p class="text-[11px] text-amber-400/80">Listrik rumah mati. Kabel Fiber Optik TIDAK PUTUS.</p>`;
         } else {
-            diagStatus.innerText = '🚨 LOSE KONEKSI (LOS)';
+            diagStatus.innerText = '🚨 LOSE KONEKSI / OFFLINE';
             diagStatus.className = 'font-bold text-rose-400';
             trapBox.className = 'p-3.5 rounded-xl border bg-rose-950/20 border-rose-800/40 text-xs space-y-1 text-rose-300 font-mono';
-            trapBox.innerHTML = `<div><i class="fa-solid fa-scissors"></i> Terdeteksi Loss of Signal (LOS)</div><p class="text-[11px] text-rose-400/80">Kabel Drop Core terputus atau ODP bermasalah.</p>`;
+            trapBox.innerHTML = `<div><i class="fa-solid fa-scissors"></i> Terdeteksi Loss of Signal (LOS) / Offline</div><p class="text-[11px] text-rose-400/80">Kabel Drop Core terputus atau Adaptor Router dicabut.</p>`;
         }
 
         openModal('diag-modal');
 
-        // LOGIKA BARU: Manual Eksekusi Cek Redaman
+        // LOGIKA BARU: Manual Eksekusi Cek Redaman & Animasi
         if (status === 'ONLINE') {
-            document.getElementById('diag-rx').innerHTML = '<span class="text-slate-500 text-[11px]"><i class="fa-solid fa-arrow-down"></i> Klik "Cek Redaman" di bawah</span>';
+            // Berikan animasi Glow Cyan berkedip lambat (IDLE)
+            boxRx.classList.add('rx-box-idle');
+            document.getElementById('diag-rx').innerHTML = '<span class="text-sky-400 text-[11px] font-bold flex items-center gap-1.5 mt-1"><i class="fa-solid fa-hand-point-down fa-bounce text-sm"></i> KLIK CEK REDAMAN</span>';
             
             const btnCek = document.getElementById('btn-cek-redaman');
             if(btnCek) {
@@ -663,7 +648,7 @@
                 btnCek.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Cek Redaman';
             }
         } else {
-             document.getElementById('diag-rx').innerText = 'OFFLINE';
+             document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400 font-bold mt-1 block">OFFLINE</span>';
              const btnCek = document.getElementById('btn-cek-redaman');
              if(btnCek) btnCek.classList.add('hidden'); 
         }
@@ -676,7 +661,12 @@
         const btn = document.getElementById('btn-cek-redaman');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menghubungkan...';
-        document.getElementById('diag-rx').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-slate-500"></i> Memulai...';
+        
+        // Ubah animasi kotak jadi Amber (LOADING)
+        const boxRx = document.getElementById('box-rx');
+        boxRx.classList.remove('rx-box-idle');
+        boxRx.classList.add('rx-box-loading');
+        document.getElementById('diag-rx').innerHTML = '<span class="text-amber-400 text-[11px] font-bold flex items-center gap-1.5 mt-1"><i class="fa-solid fa-satellite-dish fa-fade text-sm"></i> MENGHUBUNGKAN...</span>';
 
         try {
             let serverKey = currentDiagNode;
@@ -697,7 +687,8 @@
                 pollCekRedamanResultQueue(data.queueId);
             }
         } catch (err) {
-            document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Gagal Server</span>';
+            boxRx.classList.remove('rx-box-loading');
+            document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400 mt-1 block">Gagal Server</span>';
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Cek Redaman';
         }
@@ -706,32 +697,36 @@
     function pollCekRedamanResultQueue(queueId) {
         let hasNotifiedProcessing = false;
         let lastPosition = 0;
+        const boxRx = document.getElementById('box-rx');
         
         const interval = setInterval(async () => {
             try {
                 const res = await fetch(`/api/queue-result/${queueId}`);
                 const data = await res.json();
                 
-                // STATUS 1: MENGANTRE
+                // STATUS 1: MENGANTRE (Tetap Amber Loading)
                 if (data.status === 'pending') {
                     if (lastPosition !== data.position) {
                         showToast('MENGANTRE', `Anda berada di antrian ke-${data.position}. Mohon tunggu.`, 'amber');
                         lastPosition = data.position;
                     }
-                    document.getElementById('diag-rx').innerHTML = `<i class="fa-solid fa-hourglass-half text-amber-500"></i> Antrian (${data.position})`;
+                    document.getElementById('diag-rx').innerHTML = `<span class="text-amber-400 text-[11px] font-bold flex items-center gap-1.5 mt-1"><i class="fa-solid fa-hourglass-half fa-spin text-sm"></i> ANTRIAN KE-${data.position}</span>`;
                     document.getElementById('btn-cek-redaman').innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Antri (${data.position})...`;
                 } 
-                // STATUS 2: GILIRAN TIBA / SEDANG SCAN
+                // STATUS 2: GILIRAN TIBA / SEDANG SCAN (Animasi Turbo Cyan)
                 else if (data.status === 'processing') {
                     if (!hasNotifiedProcessing) {
                         showToast('ANTRIAN SELESAI', 'Otomatis memindai redaman ke OLT!', 'cyan');
                         hasNotifiedProcessing = true;
                         
-                        document.getElementById('diag-rx').innerHTML = '<i class="fa-solid fa-satellite-dish fa-beat text-cyan-400"></i> Memindai Turbo...';
+                        boxRx.classList.remove('rx-box-loading');
+                        boxRx.classList.add('rx-box-scanning');
+                        
+                        document.getElementById('diag-rx').innerHTML = '<span class="text-cyan-400 text-[11px] font-bold flex items-center gap-1.5 mt-1"><i class="fa-solid fa-satellite-dish fa-beat text-sm"></i> MEMINDAI OLT...</span>';
                         document.getElementById('btn-cek-redaman').innerHTML = '<i class="fa-solid fa-satellite-dish fa-beat"></i> Memindai...';
                     }
                 } 
-                // STATUS 3: SELESAI
+                // STATUS 3: SELESAI (Warna Ungu Finish)
                 else if (data.status === 'done') {
                     clearInterval(interval);
                     let redamanText = "Tdk Ditemukan";
@@ -740,7 +735,9 @@
                         if(match && match[1]) redamanText = match[1];
                     }
                     
-                    document.getElementById('diag-rx').innerHTML = `<span class="text-purple-300 font-bold">${redamanText}</span>`;
+                    boxRx.classList.remove('rx-box-loading', 'rx-box-scanning');
+                    boxRx.classList.add('rx-box-done');
+                    document.getElementById('diag-rx').innerHTML = `<span class="text-purple-300 font-bold text-sm mt-1 block">${redamanText}</span>`;
                     
                     const btnCek = document.getElementById('btn-cek-redaman');
                     btnCek.disabled = false;
@@ -749,7 +746,9 @@
                 // STATUS 4: ERROR
                 else if (data.status === 'error') {
                     clearInterval(interval);
-                    document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400">Error OLT</span>';
+                    boxRx.classList.remove('rx-box-loading', 'rx-box-scanning');
+                    document.getElementById('diag-rx').innerHTML = '<span class="text-rose-400 font-bold mt-1 block">Error OLT</span>';
+                    
                     const btnCek = document.getElementById('btn-cek-redaman');
                     btnCek.disabled = false;
                     btnCek.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Cek Redaman';
@@ -986,9 +985,16 @@
              }
          }
 
+         // Animasi Finish (Ungu Statis)
+         const boxRx = document.getElementById('box-rx');
+         if (boxRx) {
+             boxRx.classList.remove('rx-box-loading', 'rx-box-scanning');
+             boxRx.classList.add('rx-box-done');
+         }
+
          const diagRxElement = document.getElementById('diag-rx');
          if (diagRxElement) {
-             diagRxElement.innerHTML = `<span class="text-purple-300 font-bold">${redamanText}</span>`;
+             diagRxElement.innerHTML = `<span class="text-purple-300 font-bold text-sm mt-1 block">${redamanText}</span>`;
          }
          
          let matchCust = customers.find(c => c.name.toLowerCase() === currentDiagUser.toLowerCase());
