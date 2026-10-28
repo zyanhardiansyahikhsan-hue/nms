@@ -108,7 +108,7 @@ async function cekRedamanHSAirpoCibarola(oltConfig, mac, control = {}) {
 }
 
 // ==========================================
-// 3. Hioso (Puppeteer) - FAST MODE DENGAN BLOCKER
+// 3. Hioso (Puppeteer) - FAST MODE DENGAN BLOCKER & FINALLY GUARD
 // ==========================================
 async function cekRedamanHioso(oltConfig, mac, control = {}) {
     let searchMac = mac.substring(0, 16);
@@ -123,13 +123,13 @@ async function cekRedamanHioso(oltConfig, mac, control = {}) {
         if (browser) { try { await browser.close(); } catch (e) {} }
     };
 
-    const browserLaunch = puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    });
-    browser = await browserLaunch;
-    
     try {
+        const browserLaunch = puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+        });
+        browser = await browserLaunch;
+        
         const page = await browser.newPage();
         const ensureActive = () => { if (control.cancelled) throw new Error('Scan dibatalkan karena OLT lain sudah menemukan MAC'); };
         page.setDefaultTimeout(20000); 
@@ -266,7 +266,11 @@ async function cekRedamanHioso(oltConfig, mac, control = {}) {
         console.error(`   ❌ Error: ${error.message}`);
         return { error: error.message };
     } finally {
-        await browser.close();
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (e) {}
+        }
     }
 }
 
@@ -301,9 +305,6 @@ async function scanSemuaOlt(oltList, mac, onFound) {
     console.log(`🚀 MULAI SCAN ${oltList.length} OLT...`);
     console.log(`========================================`);
 
-    // CIBAROLA & SUKAMELANG: semua OLT dijalankan BERSAMAAN.
-    // Begitu salah satu OLT menemukan redaman, hasil LANGSUNG dikirim
-    // tanpa menunggu OLT lain selesai. Scan OLT lain dibatalkan.
     const fastParallelServer = oltList.some(olt =>
         String(olt.label || '').toLowerCase().includes('cibarola')
     ) || oltList.some(olt =>
@@ -353,7 +354,6 @@ async function scanSemuaOlt(oltList, mac, onFound) {
                             console.log(`\n✅ KETEMU di ${hasil.olt_name}!`);
                             console.log(`   📉 Redaman: ${hasil.redaman}`);
 
-                            // KIRIM SECEPATNYA. Jangan tunggu OLT lain.
                             const teksHasil = `\n✅ *${hasil.olt_name}*\n   📉 Redaman: *${hasil.redaman}*\n   📡 Status: ${hasil.status}`;
                             try {
                                 await onFound(teksHasil);
@@ -361,7 +361,6 @@ async function scanSemuaOlt(oltList, mac, onFound) {
                                 console.error(`   ❌ Gagal mengirim hasil: ${err.message}`);
                             }
 
-                            // Setelah hasil terkirim, batalkan semua OLT lain.
                             for (const [otherOlt, otherControl] of controls.entries()) {
                                 if (otherOlt !== olt && !otherControl.cancelled) {
                                     otherControl.cancelled = true;
@@ -393,7 +392,6 @@ async function scanSemuaOlt(oltList, mac, onFound) {
         return winner;
     }
 
-    // SERVER LAIN: tetap sequential seperti perilaku sebelumnya.
     console.log(`🔄 Mode Sequential: scan OLT satu per satu`);
 
     let foundResult = null;
@@ -421,7 +419,6 @@ async function scanSemuaOlt(oltList, mac, onFound) {
                 const teksHasil = `\n✅ *${hasil.olt_name}*\n   📉 Redaman: *${hasil.redaman}*\n   📡 Status: ${hasil.status}`;
                 await onFound(teksHasil);
 
-                // Server selain Cibarola tetap auto-stop.
                 break;
             }
         } catch (err) {
