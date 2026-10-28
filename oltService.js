@@ -266,14 +266,9 @@ async function cekRedamanHioso(oltConfig, mac, control = {}) {
         console.error(`   ❌ Error: ${error.message}`);
         return { error: error.message };
     } finally {
-        // INI YANG PALING PENTING:
-        // Pastikan browser SELALU ditutup baik saat sukses maupun error
-        if (browser) {
-            try {
-                await browser.close();
-            } catch (e) {}
-        }
+        await browser.close();
     }
+}
 
 // ==========================================
 // 4. RETRY WRAPPER
