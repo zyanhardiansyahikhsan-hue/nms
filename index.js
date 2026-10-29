@@ -413,3 +413,65 @@ app.post('/api/reboot-ont', async (req, res) => {
 
 process.on('unhandledRejection', err => console.error('❌ UNHANDLED:', err));
 process.on('uncaughtException', err => { if (err.name === 'RosException' && err.message.includes('Timed out')) return; console.error('❌ UNCAUGHT:', err); });
+
+// ==========================================
+// 📱 KONFIGURASI TELEGRAM BOT & NOTIFIKASI
+// ==========================================
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
+
+async function sendTelegramAlert(message) {
+    if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) return;
+    try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text: message,
+                parse_mode: 'Markdown'
+            })
+        });
+    } catch (err) {
+        console.error("Gagal mengirim Telegram alert:", err);
+    }
+}
+
+// Penampung hitungan LOS / Dying Gasp per OLT untuk filter minimal 5 orang
+let losCounters = {};
+
+function handleMassLosCheck(oltName, type) {
+    if (type === 'LOS' || type === 'DYING_GASP') {
+        let key = `${oltName}_${type}`;
+        
+        if (!losCounters[key]) {
+            losCounters[key] = { count: 0, timer: null };
+        }
+        
+        losCounters[key].count++;
+        
+        // SYARAT: Minimal 5 pelanggan mengalami LOS/Mati Listrik beruntun dalam waktu bersamaan
+        if (losCounters[key].count >= 5) {
+            let jenis = type === 'DYING_GASP' ? 'MATI LISTRIK MASSA (Dying Gasp)' : 'KABEL FO UTAMA PUTUS (LOS)';
+            let alertMessage = `🚨 *CRITICAL ALARM: GANGGUAN MASSA* 🚨\n\n` +
+                               `Terdeteksi *${losCounters[key].count} pelanggan* mengalami offline / gangguan secara bersamaan!\n` +
+                               `📍 *Perangkat OLT:* ${oltName}\n` +
+                               `⚠️ *Indikasi:* ${jenis}\n\n` +
+                               `Mohon segera diperiksa oleh tim teknisi lapangan!`;
+            
+            sendTelegramAlert(alertMessage);
+            
+            // Reset hitungan setelah alert terkirim agar tidak spam
+            losCounters[key].count = 0;
+        }
+        
+        // Reset otomatis jika dalam rentang 15 detik tidak mencapai 5 laporan
+        clearTimeout(losCounters[key].timer);
+        losCounters[key].timer = setTimeout(() => {
+            if (losCounters[key]) {
+                losCounters[key].count = 0;
+            }
+        }, 15000);
+    }
+}
