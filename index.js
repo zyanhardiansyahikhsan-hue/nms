@@ -69,7 +69,7 @@ try {
     console.log(`⚠️ Gagal bind port 162 UDP:`, err.message);
 }
 
-// Simpan status terakhir pelanggan untuk mendeteksi perubahan real-time
+// Simpan status terakhir pelanggan untuk notifikasi real-time
 let previousCustomerStatus = new Map();
 
 async function updateCustomerCache() {
@@ -103,7 +103,7 @@ async function updateCustomerCache() {
                     }
                 });
             } catch (err) {
-                // Abaikan error koneksi
+                // Abaikan error per server agar tidak merusak server lain
             } finally {
                 if (api) await safeCloseMikrotik(api);
             }
@@ -111,14 +111,13 @@ async function updateCustomerCache() {
         }));
 
         const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+        
         if (newCache.length > 0) {
-            
-            // === DETEKSI PERUBAHAN STATUS REAL-TIME DARI MIKROTIK ===
+            // Deteksi perubahan status untuk Telegram
             newCache.forEach(cust => {
                 const uniqueKey = `${cust.node}_${cust.name}`;
                 const oldStatus = previousCustomerStatus.get(uniqueKey);
 
-                // Jika status sebelumnya sudah tercatat dan berbeda dari status sekarang
                 if (oldStatus && oldStatus !== cust.status) {
                     let icon = cust.status === 'ONLINE' ? '🟢' : '🔴';
                     let ket = cust.status === 'ONLINE' ? 'Koneksi Kembali Normal (ONLINE)' : 'Putus Koneksi / Offline (LOS)';
@@ -130,21 +129,20 @@ async function updateCustomerCache() {
                               `🌐 *IP:* ${cust.ip}\n` +
                               `⏱️ *Waktu:* ${new Date().toLocaleTimeString('id-ID')} WIB`;
 
-                    // Kirim notifikasi instan ke Telegram
                     sendTelegramAlert(msg);
                 }
-
-                // Perbarui status memori
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
 
+            // Timpa cache utama dengan data baru yang valid
             globalCustomerCache = newCache;
         }
+    } catch (e) {
+        console.error("Error update cache:", e);
     } finally {
         isFetchingCache = false;
     }
-}
-// 1. Jalankan sync saat aplikasi pertama kali menyala di Railway
+}// 1. Jalankan sync saat aplikasi pertama kali menyala di Railway
 updateCustomerCache();
 
 // 2. Lakukan update data di belakang layar setiap 20 detik (20000 milidetik)
