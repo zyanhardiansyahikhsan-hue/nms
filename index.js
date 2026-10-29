@@ -133,7 +133,7 @@ async function updateCustomerCache() {
                               `📍 *Node:* ${cust.node}\n` +
                               `📌 *Status:* ${ket}\n` +
                               `🌐 *IP:* ${cust.ip}\n` +
-                              `⏱️ *Waktu:* ${new Date().toLocaleTimeString('id-ID')} WIB`;
+                              `⏱️ *Waktu:* ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
 
                     sendTelegramAlert(msg);
                 }
