@@ -69,8 +69,12 @@ try {
     console.log(`⚠️ Gagal bind port 162 UDP:`, err.message);
 }
 
-// Simpan status terakhir pelanggan untuk notifikasi real-time
-let previousCustomerStatus = new Map();
+// ==========================================
+// 🔄 SISTEM CACHE & BACKGROUND SYNC PELANGGAN
+// ==========================================
+let globalCustomerCache = [];
+let isFetchingCache = false;
+let previousCustomerStatus = new Map(); // Penyimpan status untuk deteksi Telegram real-time
 
 async function updateCustomerCache() {
     if (isFetchingCache) return;
@@ -85,6 +89,7 @@ async function updateCustomerCache() {
                 const { api: mikrotikApi, targetServer } = await connectMikrotik(srvKey);
                 api = mikrotikApi;
                 
+                // SUPER PARALEL: Ambil Secret & Active dalam waktu bersamaan
                 const [secrets, activeUsers] = await Promise.all([
                     getUserSecrets(api),
                     getActiveUsers(api)
@@ -103,17 +108,18 @@ async function updateCustomerCache() {
                     }
                 });
             } catch (err) {
-                // Abaikan error per server agar tidak merusak server lain
+                // Abaikan error di background
             } finally {
                 if (api) await safeCloseMikrotik(api);
             }
             return nodeCustomers;
         }));
 
+        // Timpa memori dengan data terbaru jika koneksi sukses
         const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-        
         if (newCache.length > 0) {
-            // Deteksi perubahan status untuk Telegram
+            
+            // Deteksi perubahan status real-time per pelanggan lewat MikroTik
             newCache.forEach(cust => {
                 const uniqueKey = `${cust.node}_${cust.name}`;
                 const oldStatus = previousCustomerStatus.get(uniqueKey);
@@ -134,7 +140,6 @@ async function updateCustomerCache() {
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
 
-            // Timpa cache utama dengan data baru yang valid
             globalCustomerCache = newCache;
         }
     } catch (e) {
@@ -142,17 +147,18 @@ async function updateCustomerCache() {
     } finally {
         isFetchingCache = false;
     }
-}// 1. Jalankan sync saat aplikasi pertama kali menyala di Railway
+}
+
+// 1. Jalankan sync saat aplikasi pertama kali menyala
 updateCustomerCache();
 
-// 2. Lakukan update data di belakang layar setiap 20 detik (20000 milidetik)
+// 2. Lakukan update data di belakang layar setiap 20 detik
 setInterval(updateCustomerCache, 20000);
 
 // ==========================================
 // 🔄 API GET CUSTOMERS (INSTAN)
 // ==========================================
 app.get('/api/customers', (req, res) => {
-    // API ini langsung memuntahkan data dari memori RAM, tanpa perlu nunggu MikroTik!
     res.json({ success: true, customers: globalCustomerCache });
 });
 
@@ -182,39 +188,6 @@ app.get('/api/server-olt/:serverLabel', (req, res) => {
         serverLabel: config.servers[foundServerKey].label, 
         olts: config.servers[foundServerKey].olts || [] 
     });
-});
-
-// ==========================================
-// 🔄 API SCAN MAC ADDRESS DI PON SPESIFIK (CARA 2)
-// ==========================================
-app.post('/api/cek-redaman', async (req, res) => {
-    const { serverKey, username } = req.body;
-    if (!serverKey || !username) return res.status(400).json({ error: 'Server dan username wajib diisi' });
-    let api;
-    const result = await enqueueTask(async () => {
-        const { api: mikrotikApi, targetServer } = await connectMikrotik(serverKey);
-        api = mikrotikApi;
-        const userObj = await getUserFromMikrotik(api, username);
-        let rawMac = userObj['caller-id'] || 'Any';
-        const activeUser = await getActiveUserFromMikrotik(api, username);
-        if (activeUser) rawMac = activeUser['caller-id'] || rawMac;
-        if (!rawMac || rawMac === 'Any') throw new Error('MAC Address tidak terbaca');
-        const mac = rawMac.trim().toLowerCase();
-        let oltText = 'ONU tidak ditemukan di OLT manapun';
-        
-        // === UBAH BAGIAN INI AGAR MEMANCARKAN SOCKET ===
-        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { 
-            oltText = teksHasil; 
-            // PANCARKAN HASIL SEKETIKA KE FRONTEND LEWAT SOCKET!
-            io.emit('realtime_redaman_result', { username, redamanText: teksHasil });
-        });
-        // ===============================================
-
-        return { username, server: targetServer.label, mac, olt: oltText };
-    }, username, config.servers[serverKey]?.label || 'Unknown');
-    
-    await safeCloseMikrotik(api);
-    res.json(result);
 });
 
 const PORT = process.env.PORT || 8080;
@@ -275,7 +248,6 @@ let isProcessingQueue = false;
 let currentTask = null;
 const queueResults = new Map();
 
-// 1. UPDATE: Semua request sekarang wajib masuk antrean agar tidak membuat HTTP request hang
 async function enqueueTask(taskFn, username, serverLabel) {
     const queueId = Date.now() + Math.random().toString(36).substr(2, 9);
     const position = requestQueue.length + 1;
@@ -283,26 +255,21 @@ async function enqueueTask(taskFn, username, serverLabel) {
     requestQueue.push({ execute: taskFn, username, server: serverLabel, queueId });
     queueResults.set(queueId, { status: 'pending', position });
     
-    // Mulai proses background jika queue sedang kosong
     if (!isProcessingQueue) {
         isProcessingQueue = true;
         setTimeout(processNextInQueue, 0);
     }
     
-    // Selalu kembalikan respon instan agar frontend bisa mulai memantau antrean
     return { queued: true, position, queueId, estimatedWait: position * 90 };
 }
 
-// 2. UPDATE: Tambahkan status 'processing' saat giliran tiba dan update urutan sisa antrean
 async function processNextInQueue() {
     if (requestQueue.length > 0) {
         const next = requestQueue.shift();
         currentTask = { username: next.username, server: next.server };
         
-        // Tandai bahwa antrean ini sudah mulai dieksekusi (processing)
         queueResults.set(next.queueId, { status: 'processing' });
         
-        // Update sisa posisi antrean lainnya
         requestQueue.forEach((task, index) => {
             const res = queueResults.get(task.queueId);
             if (res && res.status === 'pending') res.position = index + 1;
@@ -315,21 +282,20 @@ async function processNextInQueue() {
             queueResults.set(next.queueId, { status: 'error', error: err.message });
         } finally {
             currentTask = null;
-            processNextInQueue(); // Lanjut ke antrean berikutnya
+            processNextInQueue();
         }
     } else {
         isProcessingQueue = false;
     }
 }
 
-// 3. UPDATE: API Queue memunculkan status 'processing' ke web
 app.get('/api/queue-result/:queueId', (req, res) => {
     const { queueId } = req.params;
     const result = queueResults.get(queueId);
     
     if (!result) return res.json({ status: 'not_found' });
     if (result.status === 'pending') return res.json({ status: 'pending', position: result.position });
-    if (result.status === 'processing') return res.json({ status: 'processing' }); // Status Baru!
+    if (result.status === 'processing') return res.json({ status: 'processing' });
     if (result.status === 'done') { queueResults.delete(queueId); return res.json({ status: 'done', success: true, data: result.data }); }
     if (result.status === 'error') { queueResults.delete(queueId); return res.json({ status: 'error', success: false, error: result.error }); }
 });
@@ -347,15 +313,12 @@ app.post('/api/cek-redaman', async (req, res) => {
         if (activeUser) rawMac = activeUser['caller-id'] || rawMac;
         if (!rawMac || rawMac === 'Any') throw new Error('MAC Address tidak terbaca');
         const mac = rawMac.trim().toLowerCase();
-        // ... (dalam /api/cek-redaman)
         let oltText = 'ONU tidak ditemukan di OLT manapun';
         await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { 
             oltText = teksHasil; 
-            // PANCARKAN HASIL SEKETIKA KE FRONTEND LEWAT SOCKET!
             io.emit('realtime_redaman_result', { username, redamanText: teksHasil });
         });
         return { username, server: targetServer.label, mac, olt: oltText };
-// ...
     }, username, config.servers[serverKey]?.label || 'Unknown');
     
     await safeCloseMikrotik(api);
@@ -398,9 +361,6 @@ app.post('/api/aktivasi', async (req, res) => {
     res.json(result);
 });
 
-// ==========================================
-// 🔄 API REBOOT ONT / RESET SESSION PPPOE (BARU)
-// ==========================================
 app.post('/api/reboot-ont', async (req, res) => {
     const { serverKey, username, mac } = req.body;
     if (!serverKey || !username) return res.status(400).json({ error: 'Server dan username wajib diisi' });
@@ -410,7 +370,6 @@ app.post('/api/reboot-ont', async (req, res) => {
         const { api: mikrotikApi, targetServer } = await connectMikrotik(serverKey);
         api = mikrotikApi;
 
-        // Putus active session PPPoE MikroTik agar ONT/Router dial-up ulang
         const activeUser = await getActiveUserFromMikrotik(api, username);
         if (activeUser && activeUser['.id']) {
             await api.write(['/ppp/active/remove', `=.id=${activeUser['.id']}`]);
@@ -428,9 +387,6 @@ app.post('/api/reboot-ont', async (req, res) => {
     await safeCloseMikrotik(api);
     res.json(result);
 });
-
-process.on('unhandledRejection', err => console.error('❌ UNHANDLED:', err));
-process.on('uncaughtException', err => { if (err.name === 'RosException' && err.message.includes('Timed out')) return; console.error('❌ UNCAUGHT:', err); });
 
 // ==========================================
 // 📱 KONFIGURASI TELEGRAM BOT & NOTIFIKASI
@@ -456,40 +412,5 @@ async function sendTelegramAlert(message) {
     }
 }
 
-// Penampung hitungan LOS / Dying Gasp per OLT untuk filter minimal 5 orang
-let losCounters = {};
-
-function handleMassLosCheck(oltName, type) {
-    if (type === 'LOS' || type === 'DYING_GASP') {
-        let key = `${oltName}_${type}`;
-        
-        if (!losCounters[key]) {
-            losCounters[key] = { count: 0, timer: null };
-        }
-        
-        losCounters[key].count++;
-        
-        // SYARAT: Minimal 5 pelanggan mengalami LOS/Mati Listrik beruntun dalam waktu bersamaan
-        if (losCounters[key].count >= 5) {
-            let jenis = type === 'DYING_GASP' ? 'MATI LISTRIK MASSA (Dying Gasp)' : 'KABEL FO UTAMA PUTUS (LOS)';
-            let alertMessage = `🚨 *CRITICAL ALARM: GANGGUAN MASSA* 🚨\n\n` +
-                               `Terdeteksi *${losCounters[key].count} pelanggan* mengalami offline / gangguan secara bersamaan!\n` +
-                               `📍 *Perangkat OLT:* ${oltName}\n` +
-                               `⚠️ *Indikasi:* ${jenis}\n\n` +
-                               `Mohon segera diperiksa oleh tim teknisi lapangan!`;
-            
-            sendTelegramAlert(alertMessage);
-            
-            // Reset hitungan setelah alert terkirim agar tidak spam
-            losCounters[key].count = 0;
-        }
-        
-        // Reset otomatis jika dalam rentang 15 detik tidak mencapai 5 laporan
-        clearTimeout(losCounters[key].timer);
-        losCounters[key].timer = setTimeout(() => {
-            if (losCounters[key]) {
-                losCounters[key].count = 0;
-            }
-        }, 15000);
-    }
-}
+process.on('unhandledRejection', err => console.error('❌ UNHANDLED:', err));
+process.on('uncaughtException', err => { if (err.name === 'RosException' && err.message.includes('Timed out')) return; console.error('❌ UNCAUGHT:', err); });
