@@ -1,4 +1,4 @@
-// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync)
+// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync & Telegram Interactive)
 const path = require('path');
 const express = require('express');
 const http = require('http');
@@ -59,7 +59,7 @@ trapReceiver.on('message', (msg, rinfo) => {
         oltName,
         type,
         message,
-        time: new Date().toLocaleTimeString('id-ID')
+        time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })
     });
 });
 
@@ -89,7 +89,6 @@ async function updateCustomerCache() {
                 const { api: mikrotikApi, targetServer } = await connectMikrotik(srvKey);
                 api = mikrotikApi;
                 
-                // SUPER PARALEL: Ambil Secret & Active dalam waktu bersamaan
                 const [secrets, activeUsers] = await Promise.all([
                     getUserSecrets(api),
                     getActiveUsers(api)
@@ -115,7 +114,6 @@ async function updateCustomerCache() {
             return nodeCustomers;
         }));
 
-        // Timpa memori dengan data terbaru jika koneksi sukses
         const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
         if (newCache.length > 0) {
             
@@ -128,14 +126,28 @@ async function updateCustomerCache() {
                     let icon = cust.status === 'ONLINE' ? '🟢' : '🔴';
                     let ket = cust.status === 'ONLINE' ? 'Koneksi Kembali Normal (ONLINE)' : 'Putus Koneksi / Offline (LOS)';
                     
+                    // Format pesan (IP dihilangkan)
                     let msg = `${icon} *STATUS PELANGGAN BERUBAH*\n\n` +
                               `👤 *Nama:* ${cust.name}\n` +
                               `📍 *Node:* ${cust.node}\n` +
                               `📌 *Status:* ${ket}\n` +
-                              `🌐 *IP:* ${cust.ip}\n` +
                               `⏱️ *Waktu:* ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
 
-                    sendTelegramAlert(msg);
+                    let replyMarkup = null;
+                    if (cust.status === 'ONLINE') {
+                        replyMarkup = {
+                            inline_keyboard: [
+                                [
+                                    {
+                                        text: "📡 Cek Redaman OLT",
+                                        callback_data: `cekredaman_${cust.node}_${cust.name}`
+                                    }
+                                ]
+                            ]
+                        };
+                    }
+
+                    sendTelegramAlert(msg, replyMarkup);
                 }
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
@@ -394,21 +406,114 @@ app.post('/api/reboot-ont', async (req, res) => {
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
 
-async function sendTelegramAlert(message) {
+async function sendTelegramAlert(message, replyMarkup = null) {
     if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) return;
     try {
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const bodyData = {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+            parse_mode: 'Markdown'
+        };
+
+        if (replyMarkup) {
+            bodyData.reply_markup = replyMarkup;
+        }
+
         await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: TELEGRAM_CHAT_ID,
-                text: message,
-                parse_mode: 'Markdown'
-            })
+            body: JSON.stringify(bodyData)
         });
     } catch (err) {
         console.error("Gagal mengirim Telegram alert:", err);
+    }
+}
+
+// ==========================================
+// 🤖 TELEGRAM BOT BUTTON CLICK LISTENER (POLLING)
+// ==========================================
+let telegramOffset = 0;
+
+async function pollTelegramUpdates() {
+    if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) return;
+    try {
+        const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${telegramOffset}&timeout=30`);
+        const data = await res.json();
+        
+        if (data.ok && data.result) {
+            for (const update of data.result) {
+                telegramOffset = update.update_id + 1;
+
+                if (update.callback_query) {
+                    const callbackQuery = update.callback_query;
+                    const dataParts = callbackQuery.data.split('_'); 
+                    
+                    if (dataParts[0] === 'cekredaman') {
+                        const nodeLabel = dataParts[1];
+                        const username = dataParts.slice(2).join('_'); 
+
+                        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                callback_query_id: callbackQuery.id,
+                                text: `Memindai redaman untuk ${username}...`,
+                                show_alert: false
+                            })
+                        });
+
+                        jalankanCekRedamanOtomatis(nodeLabel, username);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        // Abaikan error polling sementara
+    }
+    setTimeout(pollTelegramUpdates, 1000);
+}
+
+if (TELEGRAM_BOT_TOKEN && !TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) {
+    pollTelegramUpdates();
+}
+
+async function jalankanCekRedamanOtomatis(nodeLabel, username) {
+    try {
+        let serverKey = nodeLabel;
+        const foundKey = Object.keys(config.servers).find(
+            key => config.servers[key].label.toLowerCase() === nodeLabel.toLowerCase()
+        );
+        if (foundKey) serverKey = foundKey;
+
+        const { api, targetServer } = await connectMikrotik(serverKey);
+        const userObj = await getUserFromMikrotik(api, username);
+        let rawMac = userObj['caller-id'] || 'Any';
+        const activeUser = await getActiveUserFromMikrotik(api, username);
+        if (activeUser) rawMac = activeUser['caller-id'] || rawMac;
+        await safeCloseMikrotik(api);
+
+        if (!rawMac || rawMac === 'Any') {
+            sendTelegramAlert(`❌ Gagal cek redaman *${username}*: MAC Address tidak ditemukan.`);
+            return;
+        }
+
+        const mac = rawMac.trim().toLowerCase();
+        let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
+
+        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => {
+            hasilRedaman = teksHasil;
+        });
+
+        let hasilMsg = `📊 *HASIL CEK REDAMAN*\n\n` +
+                       `👤 *Nama:* ${username}\n` +
+                       `📍 *Node:* ${nodeLabel}\n\n` +
+                       `${hasilRedaman}`;
+        
+        sendTelegramAlert(hasilMsg);
+
+    } catch (err) {
+        sendTelegramAlert(`❌ Gagal memproses cek redaman untuk *${username}*: ${err.message}`);
     }
 }
 
