@@ -152,13 +152,17 @@
       </section>
 
       <section class="space-y-1.5">
-        <div class="text-[11px] font-bold text-slate-500 mb-2">Aksi</div>
-        <button onclick="toggleMenu(false);openModal('telegram-modal')" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left bg-sky-500/10 border-sky-500/30 text-sky-400"><i class="fa-brands fa-telegram w-5 text-center"></i>Telegram Bot</button>
+        <div class="text-[11px] font-bold text-slate-500 mb-2">Menu</div>
+        <button id="tab-btn-list" onclick="switchTab('list')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left"><i class="fa-solid fa-users w-5 text-center"></i><span class="flex-1">Daftar Pelanggan</span></button>
+        <button id="tab-btn-topology" onclick="switchTab('topology')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left"><i class="fa-solid fa-sitemap w-5 text-center"></i><span class="flex-1">Topologi PON Port</span></button>
+        <button id="tab-btn-console" onclick="switchTab('console')" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left"><i class="fa-solid fa-terminal w-5 text-center"></i><span class="flex-1">Live Trap Feed</span><span id="badge-trap-count" class="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded-full font-mono">0</span></button>
       </section>
 
       <section class="space-y-1.5">
         <div class="text-[11px] font-bold text-slate-500 mb-2">Aksi</div>
+        <button onclick="toggleMenu(false);loadCustomersFromMikrotik()" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left bg-cyan-500/10 border-cyan-500/30 text-cyan-400"><i class="fa-solid fa-rotate w-5 text-center"></i>Auto-Sync MikroTik</button>
         <button onclick="toggleMenu(false);openModal('telegram-modal')" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left bg-sky-500/10 border-sky-500/30 text-sky-400"><i class="fa-brands fa-telegram w-5 text-center"></i>Telegram Bot</button>
+        <button onclick="toggleMenu(false);openModal('health-modal')" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-sm font-bold text-left bg-purple-500/10 border-purple-500/30 text-purple-400"><i class="fa-solid fa-heart-pulse w-5 text-center"></i>System Health</button>
       </section>
 
       <p class="text-[10px] text-slate-500 font-mono leading-relaxed"><i class="fa-solid fa-server"></i> Cluster: Panglejar • Perum • Cibarola • Sukamelang</p>
