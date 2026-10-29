@@ -69,11 +69,8 @@ try {
     console.log(`⚠️ Gagal bind port 162 UDP:`, err.message);
 }
 
-// ==========================================
-// 🔄 SISTEM CACHE & BACKGROUND SYNC PELANGGAN
-// ==========================================
-let globalCustomerCache = [];
-let isFetchingCache = false;
+// Simpan status terakhir pelanggan untuk mendeteksi perubahan real-time
+let previousCustomerStatus = new Map();
 
 async function updateCustomerCache() {
     if (isFetchingCache) return;
@@ -88,7 +85,6 @@ async function updateCustomerCache() {
                 const { api: mikrotikApi, targetServer } = await connectMikrotik(srvKey);
                 api = mikrotikApi;
                 
-                // SUPER PARALEL: Ambil Secret & Active dalam waktu bersamaan
                 const [secrets, activeUsers] = await Promise.all([
                     getUserSecrets(api),
                     getActiveUsers(api)
@@ -107,23 +103,47 @@ async function updateCustomerCache() {
                     }
                 });
             } catch (err) {
-                // Abaikan error di background agar console tidak penuh
+                // Abaikan error koneksi
             } finally {
                 if (api) await safeCloseMikrotik(api);
             }
             return nodeCustomers;
         }));
 
-        // Timpa memori dengan data terbaru jika koneksi sukses
         const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
         if (newCache.length > 0) {
+            
+            // === DETEKSI PERUBAHAN STATUS REAL-TIME DARI MIKROTIK ===
+            newCache.forEach(cust => {
+                const uniqueKey = `${cust.node}_${cust.name}`;
+                const oldStatus = previousCustomerStatus.get(uniqueKey);
+
+                // Jika status sebelumnya sudah tercatat dan berbeda dari status sekarang
+                if (oldStatus && oldStatus !== cust.status) {
+                    let icon = cust.status === 'ONLINE' ? '🟢' : '🔴';
+                    let ket = cust.status === 'ONLINE' ? 'Koneksi Kembali Normal (ONLINE)' : 'Putus Koneksi / Offline (LOS)';
+                    
+                    let msg = `${icon} *STATUS PELANGGAN BERUBAH*\n\n` +
+                              `👤 *Nama:* ${cust.name}\n` +
+                              `📍 *Node:* ${cust.node}\n` +
+                              `📌 *Status:* ${ket}\n` +
+                              `🌐 *IP:* ${cust.ip}\n` +
+                              `⏱️ *Waktu:* ${new Date().toLocaleTimeString('id-ID')} WIB`;
+
+                    // Kirim notifikasi instan ke Telegram
+                    sendTelegramAlert(msg);
+                }
+
+                // Perbarui status memori
+                previousCustomerStatus.set(uniqueKey, cust.status);
+            });
+
             globalCustomerCache = newCache;
         }
     } finally {
         isFetchingCache = false;
     }
 }
-
 // 1. Jalankan sync saat aplikasi pertama kali menyala di Railway
 updateCustomerCache();
 
