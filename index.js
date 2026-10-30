@@ -117,49 +117,30 @@ async function updateCustomerCache() {
         const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
         if (newCache.length > 0) {
             
-            // Map untuk mencatat waktu terakhir pelanggan dikirimi notif (Mencegah double/spam)
-            if (!windowLastAlertTime) windowLastAlertTime = new Map();
-
+            // Timpa memori dengan data terbaru jika koneksi sukses
+        const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+        if (newCache.length > 0) {
+            
+            // Deteksi perubahan status real-time per pelanggan lewat MikroTik
             newCache.forEach(cust => {
                 const uniqueKey = `${cust.node}_${cust.name}`;
                 const oldStatus = previousCustomerStatus.get(uniqueKey);
 
                 if (oldStatus && oldStatus !== cust.status) {
-                    const nowTime = Date.now();
-                    const lastAlert = windowLastAlertTime.get(uniqueKey) || 0;
+                    let icon = cust.status === 'ONLINE' ? '🟢' : '🔴';
+                    let ket = cust.status === 'ONLINE' ? 'Koneksi Kembali Normal (ONLINE)' : 'Putus Koneksi / Offline (LOS)';
+                    
+                    let msg = `${icon} *STATUS PELANGGAN BERUBAH*\n\n` +
+                              `👤 *Nama:* ${cust.name}\n` +
+                              `📍 *Node:* ${cust.node}\n` +
+                              `📌 *Status:* ${ket}\n` +
+                              `🌐 *IP:* ${cust.ip}\n` +
+                              `⏱️ *Waktu:* ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
 
-                    // SYARAT: Kirim notif hanya jika status berubah DAN sudah lewat 60 detik dari notif terakhir pelanggan ini
-                    if (nowTime - lastAlert > 60000) {
-                        let icon = cust.status === 'ONLINE' ? '🟢' : '🔴';
-                        let ket = cust.status === 'ONLINE' ? 'Koneksi Kembali Normal (ONLINE)' : 'Putus Koneksi / Offline (LOS)';
-                        
-                        let msg = `${icon} *STATUS PELANGGAN BERUBAH*\n\n` +
-                                  `👤 *Nama:* ${cust.name}\n` +
-                                  `📍 *Node:* ${cust.node}\n` +
-                                  `📌 *Status:* ${ket}\n` +
-                                  `⏱️ *Waktu:* ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
-
-                        let replyMarkup = null;
-                        if (cust.status === 'ONLINE') {
-                            replyMarkup = {
-                                inline_keyboard: [
-                                    [
-                                        {
-                                            text: "📡 Cek Redaman OLT",
-                                            callback_data: `cekredaman_${cust.node}_${cust.name}`
-                                        }
-                                    ]
-                                ]
-                            };
-                        }
-
-                        sendTelegramAlert(msg, replyMarkup);
-                        windowLastAlertTime.set(uniqueKey, nowTime); // Catat waktu pengiriman
-                    }
+                    sendTelegramAlert(msg);
                 }
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
-
             globalCustomerCache = newCache;
         }
     } catch (e) {
