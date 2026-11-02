@@ -447,18 +447,25 @@ async function pollTelegramUpdates() {
 
                 if (update.callback_query) {
                     const callbackQuery = update.callback_query;
-                    const dataParts = callbackQuery.data.split('_'); 
-                    
-                    if (dataParts[0] === 'cekredaman') {
-                        const nodeLabel = dataParts[1];
-                        const username = dataParts.slice(2).join('_'); 
+                    const rawData = callbackQuery.data; 
+                    console.log(`🔘 [TELEGRAM BUTTON] Tombol diklik: ${rawData}`); // Debug log di terminal
 
+                    if (rawData.startsWith('cekredaman_')) {
+                        // Ambil string setelah 'cekredaman_'
+                        const payload = rawData.replace('cekredaman_', '');
+                        
+                        // Pisahkan node dan username (mengantisipasi nama node yang mungkin ada spasinya)
+                        const firstUnderscore = payload.indexOf('_');
+                        const nodeLabel = payload.substring(0, firstUnderscore);
+                        const username = payload.substring(firstUnderscore + 1);
+
+                        // Beri respons loading ke Telegram agar tombol tidak berputar terus
                         await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 callback_query_id: callbackQuery.id,
-                                text: `Memindai redaman untuk ${username}...`,
+                                text: `Memindai redaman ${username}...`,
                                 show_alert: false
                             })
                         });
@@ -469,7 +476,7 @@ async function pollTelegramUpdates() {
             }
         }
     } catch (err) {
-        // Abaikan error polling sementara
+        console.error("⚠️ Error Telegram Polling:", err.message);
     }
     setTimeout(pollTelegramUpdates, 1000);
 }
@@ -480,11 +487,15 @@ if (TELEGRAM_BOT_TOKEN && !TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) {
 
 async function jalankanCekRedamanOtomatis(nodeLabel, username) {
     try {
-        let serverKey = nodeLabel;
-        const foundKey = Object.keys(config.servers).find(
+        console.log(`🔍 [CEK REDAMAN VIA BOT] Memulai scan untuk ${username} di node ${nodeLabel}`);
+        
+        let serverKey = Object.keys(config.servers).find(
             key => config.servers[key].label.toLowerCase() === nodeLabel.toLowerCase()
         );
-        if (foundKey) serverKey = foundKey;
+        
+        if (!serverKey) {
+            serverKey = Object.keys(config.servers)[0]; // Fallback ke server pertama jika tidak ketemu
+        }
 
         const { api, targetServer } = await connectMikrotik(serverKey);
         const userObj = await getUserFromMikrotik(api, username);
@@ -494,9 +505,30 @@ async function jalankanCekRedamanOtomatis(nodeLabel, username) {
         await safeCloseMikrotik(api);
 
         if (!rawMac || rawMac === 'Any') {
-            sendTelegramAlert(`❌ Gagal cek redaman *${username}*: MAC Address tidak ditemukan.`);
+            sendTelegramAlert(`❌ Gagal cek redaman *${username}*: MAC Address / Caller-ID tidak ditemukan di MikroTik.`);
             return;
         }
+
+        const mac = rawMac.trim().toLowerCase();
+        let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
+
+        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => {
+            hasilRedaman = teksHasil;
+        });
+
+        let hasilMsg = `📊 *HASIL CEK REDAMAN*\n\n` +
+                       `👤 *Nama:* ${username}\n` +
+                       `📍 *Node:* ${nodeLabel}\n\n` +
+                       `${hasilRedaman}`;
+        
+        sendTelegramAlert(hasilMsg);
+        console.log(`✅ [CEK REDAMAN SELESAI] Berhasil kirim hasil ${username} ke Telegram.`);
+
+    } catch (err) {
+        console.error(`❌ [ERROR CEK REDAMAN BOT]:`, err.message);
+        sendTelegramAlert(`❌ Gagal memproses cek redaman untuk *${username}*:\n_${err.message}_`);
+    }
+}
 
         const mac = rawMac.trim().toLowerCase();
         let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
