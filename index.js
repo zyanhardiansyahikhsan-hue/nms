@@ -75,7 +75,7 @@ try {
 let globalCustomerCache = [];
 let isFetchingCache = false;
 let previousCustomerStatus = new Map(); // Penyimpan status untuk deteksi Telegram real-time
-let isFirstRun = true; // Penanda untuk mengabaikan notif spam saat pertama kali server menyala
+let isFirstRun = true; // Penandaa untuk mengabaikan notif spam saat pertama kali server menyala
 
 async function updateCustomerCache() {
     if (isFetchingCache) return;
