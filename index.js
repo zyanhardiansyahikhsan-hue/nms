@@ -1,4 +1,4 @@
-// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync & Telegram Interactive)
+// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync & Telegram Webhook)
 const path = require('path');
 const express = require('express');
 const http = require('http');
@@ -74,8 +74,8 @@ try {
 // ==========================================
 let globalCustomerCache = [];
 let isFetchingCache = false;
-let previousCustomerStatus = new Map(); // Penyimpan status untuk deteksi Telegram real-time
-let isFirstRun = true; // Penandaa untuk mengabaikan notif spam saat pertama kali server menyala
+let previousCustomerStatus = new Map();
+let isFirstRun = true;
 
 async function updateCustomerCache() {
     if (isFetchingCache) return;
@@ -108,7 +108,7 @@ async function updateCustomerCache() {
                     }
                 });
             } catch (err) {
-                // Abaikan error di background
+                // Abaikan error background
             } finally {
                 if (api) await safeCloseMikrotik(api);
             }
@@ -118,17 +118,14 @@ async function updateCustomerCache() {
         const newCache = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
         if (newCache.length > 0) {
             
-            // Deteksi perubahan status real-time per pelanggan lewat MikroTik
             newCache.forEach(cust => {
                 const uniqueKey = `${cust.node}_${cust.name}`;
                 const oldStatus = previousCustomerStatus.get(uniqueKey);
 
-                // Jika bukan putaran pertama dan status benar-benar berubah
                 if (!isFirstRun && oldStatus && oldStatus !== cust.status) {
                     let icon = cust.status === 'ONLINE' ? '🟢' : '🔴';
                     let ket = cust.status === 'ONLINE' ? 'Koneksi Kembali Normal (ONLINE)' : 'Putus Koneksi / Offline (LOS)';
                     
-                    // Format pesan (Tanpa IP, Waktu WIB)
                     let msg = `${icon} *STATUS PELANGGAN BERUBAH*\n\n` +
                               `👤 *Nama:* ${cust.name}\n` +
                               `📍 *Node:* ${cust.node}\n` +
@@ -154,7 +151,7 @@ async function updateCustomerCache() {
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
 
-            isFirstRun = false; // Setelah pengecekan pertama selesai, aktifkan mode deteksi perubahan
+            isFirstRun = false;
             globalCustomerCache = newCache;
         }
     } catch (e) {
@@ -164,15 +161,9 @@ async function updateCustomerCache() {
     }
 }
 
-// 1. Jalankan sync saat aplikasi pertama kali menyala
 updateCustomerCache();
-
-// 2. Lakukan update data di belakang layar setiap 20 detik
 setInterval(updateCustomerCache, 20000);
 
-// ==========================================
-// 🔄 API GET CUSTOMERS (INSTAN)
-// ==========================================
 app.get('/api/customers', (req, res) => {
     res.json({ success: true, customers: globalCustomerCache });
 });
@@ -184,9 +175,6 @@ async function getActiveUsers(api) {
     try { return await withTimeout(api.write('/ppp/active/print'), 10000, 'Timeout Active'); } catch (e) { return []; }
 }
 
-// ==========================================
-// 🔄 API GET OLT & PON PORT BERDASARKAN SERVER
-// ==========================================
 app.get('/api/server-olt/:serverLabel', (req, res) => {
     const serverLabel = req.params.serverLabel.toLowerCase();
     let foundServerKey = Object.keys(config.servers).find(
@@ -434,7 +422,7 @@ async function sendTelegramAlert(message, replyMarkup = null) {
 }
 
 // ==========================================
-// 🤖 TELEGRAM WEBHOOK ENDPOINT (MENERIMA KLIK TOMBOL)
+// 🤖 TELEGRAM WEBHOOK ENDPOINT (KLIK TOMBOL OLT)
 // ==========================================
 app.post('/api/telegram-webhook', async (req, res) => {
     try {
@@ -450,7 +438,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
                 const nodeLabel = payload.substring(0, firstUnderscore);
                 const username = payload.substring(firstUnderscore + 1);
 
-                // Kirim respons loading instan ke Telegram
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -492,25 +479,6 @@ async function jalankanCekRedamanOtomatis(nodeLabel, username) {
             sendTelegramAlert(`❌ Gagal cek redaman *${username}*: MAC Address tidak ditemukan.`);
             return;
         }
-
-        const mac = rawMac.trim().toLowerCase();
-        let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
-
-        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => {
-            hasilRedaman = teksHasil;
-        });
-
-        let hasilMsg = `📊 *HASIL CEK REDAMAN*\n\n` +
-                       `👤 *Nama:* ${username}\n` +
-                       `📍 *Node:* ${nodeLabel}\n\n` +
-                       `${hasilRedaman}`;
-        
-        sendTelegramAlert(hasilMsg);
-
-    } catch (err) {
-        sendTelegramAlert(`❌ Gagal memproses cek redaman untuk *${username}*: ${err.message}`);
-    }
-}
 
         const mac = rawMac.trim().toLowerCase();
         let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
