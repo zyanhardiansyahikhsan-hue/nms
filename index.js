@@ -434,55 +434,42 @@ async function sendTelegramAlert(message, replyMarkup = null) {
 }
 
 // ==========================================
-// 🤖 TELEGRAM BOT BUTTON CLICK LISTENER (POLLING)
+// 🤖 TELEGRAM WEBHOOK ENDPOINT (MENERIMA KLIK TOMBOL)
 // ==========================================
-let telegramOffset = 0;
-
-async function pollTelegramUpdates() {
-    if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) return;
+app.post('/api/telegram-webhook', async (req, res) => {
     try {
-        const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${telegramOffset}&timeout=30`);
-        const data = await res.json();
-        
-        if (data.ok && data.result) {
-            for (const update of data.result) {
-                telegramOffset = update.update_id + 1;
+        const update = req.body;
+        if (update && update.callback_query) {
+            const callbackQuery = update.callback_query;
+            const rawData = callbackQuery.data;
+            console.log(`🔘 [TELEGRAM WEBHOOK] Tombol diklik: ${rawData}`);
 
-                if (update.callback_query) {
-                    const callbackQuery = update.callback_query;
-                    const rawData = callbackQuery.data; 
+            if (rawData && rawData.startsWith('cekredaman_')) {
+                const payload = rawData.replace('cekredaman_', '');
+                const firstUnderscore = payload.indexOf('_');
+                const nodeLabel = payload.substring(0, firstUnderscore);
+                const username = payload.substring(firstUnderscore + 1);
 
-                    // PERBAIKAN: Menggunakan .startsWith untuk membaca callback tombol dengan aman
-                    if (rawData && rawData.startsWith('cekredaman_')) {
-                        const payload = rawData.replace('cekredaman_', '');
-                        const firstUnderscore = payload.indexOf('_');
-                        const nodeLabel = payload.substring(0, firstUnderscore);
-                        const username = payload.substring(firstUnderscore + 1);
+                // Kirim respons loading instan ke Telegram
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        callback_query_id: callbackQuery.id,
+                        text: `Memindai redaman ${username}...`,
+                        show_alert: false
+                    })
+                });
 
-                        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                callback_query_id: callbackQuery.id,
-                                text: `Memindai redaman ${username}...`,
-                                show_alert: false
-                            })
-                        });
-
-                        jalankanCekRedamanOtomatis(nodeLabel, username);
-                    }
-                }
+                jalankanCekRedamanOtomatis(nodeLabel, username);
             }
         }
+        res.status(200).send('OK');
     } catch (err) {
-        // Abaikan error polling sementara
+        console.error("❌ Error Webhook Telegram:", err.message);
+        res.status(500).send('Error');
     }
-    setTimeout(pollTelegramUpdates, 1000);
-}
-
-if (TELEGRAM_BOT_TOKEN && !TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) {
-    pollTelegramUpdates();
-}
+});
 
 async function jalankanCekRedamanOtomatis(nodeLabel, username) {
     try {
@@ -505,6 +492,25 @@ async function jalankanCekRedamanOtomatis(nodeLabel, username) {
             sendTelegramAlert(`❌ Gagal cek redaman *${username}*: MAC Address tidak ditemukan.`);
             return;
         }
+
+        const mac = rawMac.trim().toLowerCase();
+        let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
+
+        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => {
+            hasilRedaman = teksHasil;
+        });
+
+        let hasilMsg = `📊 *HASIL CEK REDAMAN*\n\n` +
+                       `👤 *Nama:* ${username}\n` +
+                       `📍 *Node:* ${nodeLabel}\n\n` +
+                       `${hasilRedaman}`;
+        
+        sendTelegramAlert(hasilMsg);
+
+    } catch (err) {
+        sendTelegramAlert(`❌ Gagal memproses cek redaman untuk *${username}*: ${err.message}`);
+    }
+}
 
         const mac = rawMac.trim().toLowerCase();
         let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
