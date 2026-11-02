@@ -394,8 +394,8 @@ app.post('/api/reboot-ont', async (req, res) => {
 // ==========================================
 // 📱 KONFIGURASI TELEGRAM BOT & NOTIFIKASI
 // ==========================================
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
 
 async function sendTelegramAlert(message, replyMarkup = null, chatId = TELEGRAM_CHAT_ID) {
     if (!TELEGRAM_BOT_TOKEN) {
