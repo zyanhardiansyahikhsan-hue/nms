@@ -75,6 +75,7 @@ try {
 let globalCustomerCache = [];
 let isFetchingCache = false;
 let previousCustomerStatus = new Map(); // Penyimpan status untuk deteksi Telegram real-time
+let isFirstRun = true; // Penanda untuk mengabaikan notif spam saat pertama kali server menyala
 
 async function updateCustomerCache() {
     if (isFetchingCache) return;
@@ -122,11 +123,12 @@ async function updateCustomerCache() {
                 const uniqueKey = `${cust.node}_${cust.name}`;
                 const oldStatus = previousCustomerStatus.get(uniqueKey);
 
-                if (oldStatus && oldStatus !== cust.status) {
+                // Jika bukan putaran pertama dan status benar-benar berubah
+                if (!isFirstRun && oldStatus && oldStatus !== cust.status) {
                     let icon = cust.status === 'ONLINE' ? '🟢' : '🔴';
                     let ket = cust.status === 'ONLINE' ? 'Koneksi Kembali Normal (ONLINE)' : 'Putus Koneksi / Offline (LOS)';
                     
-                    // Format pesan (IP dihilangkan)
+                    // Format pesan (Tanpa IP, Waktu WIB)
                     let msg = `${icon} *STATUS PELANGGAN BERUBAH*\n\n` +
                               `👤 *Nama:* ${cust.name}\n` +
                               `📍 *Node:* ${cust.node}\n` +
@@ -152,6 +154,7 @@ async function updateCustomerCache() {
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
 
+            isFirstRun = false; // Setelah pengecekan pertama selesai, aktifkan mode deteksi perubahan
             globalCustomerCache = newCache;
         }
     } catch (e) {
@@ -448,18 +451,14 @@ async function pollTelegramUpdates() {
                 if (update.callback_query) {
                     const callbackQuery = update.callback_query;
                     const rawData = callbackQuery.data; 
-                    console.log(`🔘 [TELEGRAM BUTTON] Tombol diklik: ${rawData}`); // Debug log di terminal
 
-                    if (rawData.startsWith('cekredaman_')) {
-                        // Ambil string setelah 'cekredaman_'
+                    // PERBAIKAN: Menggunakan .startsWith untuk membaca callback tombol dengan aman
+                    if (rawData && rawData.startsWith('cekredaman_')) {
                         const payload = rawData.replace('cekredaman_', '');
-                        
-                        // Pisahkan node dan username (mengantisipasi nama node yang mungkin ada spasinya)
                         const firstUnderscore = payload.indexOf('_');
                         const nodeLabel = payload.substring(0, firstUnderscore);
                         const username = payload.substring(firstUnderscore + 1);
 
-                        // Beri respons loading ke Telegram agar tombol tidak berputar terus
                         await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -476,7 +475,7 @@ async function pollTelegramUpdates() {
             }
         }
     } catch (err) {
-        console.error("⚠️ Error Telegram Polling:", err.message);
+        // Abaikan error polling sementara
     }
     setTimeout(pollTelegramUpdates, 1000);
 }
@@ -487,14 +486,12 @@ if (TELEGRAM_BOT_TOKEN && !TELEGRAM_BOT_TOKEN.includes('MASUKKAN')) {
 
 async function jalankanCekRedamanOtomatis(nodeLabel, username) {
     try {
-        console.log(`🔍 [CEK REDAMAN VIA BOT] Memulai scan untuk ${username} di node ${nodeLabel}`);
-        
         let serverKey = Object.keys(config.servers).find(
             key => config.servers[key].label.toLowerCase() === nodeLabel.toLowerCase()
         );
         
         if (!serverKey) {
-            serverKey = Object.keys(config.servers)[0]; // Fallback ke server pertama jika tidak ketemu
+            serverKey = Object.keys(config.servers)[0];
         }
 
         const { api, targetServer } = await connectMikrotik(serverKey);
@@ -505,30 +502,9 @@ async function jalankanCekRedamanOtomatis(nodeLabel, username) {
         await safeCloseMikrotik(api);
 
         if (!rawMac || rawMac === 'Any') {
-            sendTelegramAlert(`❌ Gagal cek redaman *${username}*: MAC Address / Caller-ID tidak ditemukan di MikroTik.`);
+            sendTelegramAlert(`❌ Gagal cek redaman *${username}*: MAC Address tidak ditemukan.`);
             return;
         }
-
-        const mac = rawMac.trim().toLowerCase();
-        let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
-
-        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => {
-            hasilRedaman = teksHasil;
-        });
-
-        let hasilMsg = `📊 *HASIL CEK REDAMAN*\n\n` +
-                       `👤 *Nama:* ${username}\n` +
-                       `📍 *Node:* ${nodeLabel}\n\n` +
-                       `${hasilRedaman}`;
-        
-        sendTelegramAlert(hasilMsg);
-        console.log(`✅ [CEK REDAMAN SELESAI] Berhasil kirim hasil ${username} ke Telegram.`);
-
-    } catch (err) {
-        console.error(`❌ [ERROR CEK REDAMAN BOT]:`, err.message);
-        sendTelegramAlert(`❌ Gagal memproses cek redaman untuk *${username}*:\n_${err.message}_`);
-    }
-}
 
         const mac = rawMac.trim().toLowerCase();
         let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
