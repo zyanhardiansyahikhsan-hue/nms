@@ -662,16 +662,3 @@ configureTelegramWebhook();
 
 process.on('unhandledRejection', err => console.error('❌ UNHANDLED:', err));
 process.on('uncaughtException', err => { if (err.name === 'RosException' && err.message.includes('Timed out')) return; console.error('❌ UNCAUGHT:', err); });
-// Jika ada pesan teks biasa (misal /start)
-        if (update.message && update.message.text) {
-            const chatId = update.message.chat.id;
-            const text = update.message.text;
-
-            if (text === '/start') {
-                await sendTelegramAlert(
-                    `👋 Halo! Selamat datang di *RnB Network Bot*.\n\nBot ini siap mengirimkan notifikasi status pelanggan dan pengecekan redaman OLT secara real-time.`,
-                    null,
-                    chatId
-                );
-            }
-        }
