@@ -472,6 +472,26 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
     try {
         const update = req.body;
+        
+        // 1. Jika pengguna mengirim pesan teks (misal: /start)
+        if (update && update.message && update.message.text) {
+            const chatId = update.message.chat.id;
+            const text = update.message.text.trim();
+
+            console.log(`💬 [TELEGRAM MESSAGE] Pesan dari chat_id ${chatId}: ${text}`);
+
+            if (text === '/start') {
+                await sendTelegramAlert(
+                    `👋 *Halo! Selamat datang di RnB Network Bot.*\n\n` +
+                    `Bot sistem NMS & MikroTik ini siap membantu Anda memantau status pelanggan dan melakukan pengecekan redaman OLT secara real-time.`,
+                    null,
+                    chatId
+                );
+            }
+            return;
+        }
+
+        // 2. Jika pengguna mengklik tombol interaktif
         if (!update || !update.callback_query) return;
 
         const callbackQuery = update.callback_query;
@@ -504,7 +524,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
         console.error('❌ Error Webhook Telegram:', err);
     }
 });
-
 async function jalankanCekRedamanOtomatis(nodeLabel, username, chatId) {
     let serverKey = Object.keys(config.servers).find(
         key => config.servers[key].label.toLowerCase() === nodeLabel.toLowerCase()
