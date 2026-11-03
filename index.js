@@ -1,4 +1,4 @@
-// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync & Telegram Webhook)
+// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync & Telegram Multi-User Webhook)
 const path = require('path');
 const express = require('express');
 const http = require('http');
@@ -77,6 +77,11 @@ let isFetchingCache = false;
 let previousCustomerStatus = new Map();
 let isFirstRun = true;
 
+// Daftar penyimpanan chat_id multi-user secara otomatis (menyertakan chat ID utama secara default)
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
+const activeChatIds = new Set([TELEGRAM_CHAT_ID]);
+
 async function updateCustomerCache() {
     if (isFetchingCache) return;
     isFetchingCache = true;
@@ -146,7 +151,10 @@ async function updateCustomerCache() {
                         };
                     }
 
-                    sendTelegramAlert(msg, replyMarkup);
+                    // Kirim broadcast notifikasi ke SEMUA pengguna yang terdaftar di activeChatIds
+                    activeChatIds.forEach(targetChatId => {
+                        sendTelegramAlert(msg, replyMarkup, targetChatId);
+                    });
                 }
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
@@ -405,9 +413,6 @@ app.post('/api/reboot-ont', async (req, res) => {
 // ==========================================
 // 📱 KONFIGURASI TELEGRAM BOT & NOTIFIKASI
 // ==========================================
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
-
 async function sendTelegramAlert(message, replyMarkup = null, chatId = TELEGRAM_CHAT_ID) {
     if (!TELEGRAM_BOT_TOKEN) {
         console.error('❌ TELEGRAM_BOT_TOKEN belum di-set di Railway Variables.');
@@ -447,7 +452,7 @@ async function sendTelegramAlert(message, replyMarkup = null, chatId = TELEGRAM_
 }
 
 // ==========================================
-// 🤖 TELEGRAM WEBHOOK + CEK REDAMAN BER-QUEUE
+// 🤖 TELEGRAM WEBHOOK (SUPPORT MULTI-USER /START & TOMBOL OLT)
 // ==========================================
 async function answerTelegramCallback(callbackQueryId, text) {
     if (!TELEGRAM_BOT_TOKEN) return;
@@ -472,8 +477,8 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
     try {
         const update = req.body;
-        
-        // 1. Jika pengguna mengirim pesan teks (misal: /start)
+
+        // 1. Tangani pesan teks masuk (seperti perintah /start dari pengguna baru)
         if (update && update.message && update.message.text) {
             const chatId = update.message.chat.id;
             const text = update.message.text.trim();
@@ -481,9 +486,13 @@ app.post('/api/telegram-webhook', async (req, res) => {
             console.log(`💬 [TELEGRAM MESSAGE] Pesan dari chat_id ${chatId}: ${text}`);
 
             if (text === '/start') {
+                // Daftarkan otomatis chat_id baru ke daftar broadcast penerima notifikasi
+                activeChatIds.add(String(chatId));
+
                 await sendTelegramAlert(
                     `👋 *Halo! Selamat datang di RnB Network Bot.*\n\n` +
-                    `Bot sistem NMS & MikroTik ini siap membantu Anda memantau status pelanggan dan melakukan pengecekan redaman OLT secara real-time.`,
+                    `Bot sistem NMS & MikroTik ini siap membantu Anda memantau status pelanggan dan melakukan pengecekan redaman OLT secara real-time.\n\n` +
+                    `✅ *Status:* Anda telah terdaftar sebagai penerima notifikasi perubahan status pelanggan.`,
                     null,
                     chatId
                 );
@@ -491,7 +500,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
             return;
         }
 
-        // 2. Jika pengguna mengklik tombol interaktif
+        // 2. Tangani klik tombol interaktif (Cek Redaman OLT)
         if (!update || !update.callback_query) return;
 
         const callbackQuery = update.callback_query;
@@ -514,6 +523,9 @@ app.post('/api/telegram-webhook', async (req, res) => {
         const username = payload.substring(firstUnderscore + 1);
         const chatId = callbackQuery.message?.chat?.id || TELEGRAM_CHAT_ID;
 
+        // Daftarkan juga chat_id pengklik tombol jika belum ada
+        activeChatIds.add(String(chatId));
+
         await answerTelegramCallback(
             callbackQuery.id,
             `Masuk antrean cek redaman ${username}...`
@@ -524,6 +536,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
         console.error('❌ Error Webhook Telegram:', err);
     }
 });
+
 async function jalankanCekRedamanOtomatis(nodeLabel, username, chatId) {
     let serverKey = Object.keys(config.servers).find(
         key => config.servers[key].label.toLowerCase() === nodeLabel.toLowerCase()
@@ -668,7 +681,7 @@ async function configureTelegramWebhook() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     url: webhookUrl,
-                    allowed_updates: ['callback_query']
+                    allowed_updates: ['message', 'callback_query']
                 })
             }
         );
