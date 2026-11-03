@@ -317,10 +317,17 @@ app.post('/api/cek-redaman', async (req, res) => {
         if (!rawMac || rawMac === 'Any') throw new Error('MAC Address tidak terbaca');
         const mac = rawMac.trim().toLowerCase();
         let oltText = 'ONU tidak ditemukan di OLT manapun';
-        await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { 
-            oltText = teksHasil; 
-            io.emit('realtime_redaman_result', { username, redamanText: teksHasil });
-        });
+        
+        try {
+            await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { 
+                oltText = teksHasil; 
+                io.emit('realtime_redaman_result', { username, redamanText: teksHasil });
+            });
+        } catch (oltErr) {
+            console.error(`⚠️ Error saat scan OLT untuk ${username}:`, oltErr.message);
+            oltText = `Gagal memindai OLT: ${oltErr.message}`;
+        }
+
         return { username, server: targetServer.label, mac, olt: oltText };
     }, username, config.servers[serverKey]?.label || 'Unknown');
     
@@ -354,7 +361,11 @@ app.post('/api/aktivasi', async (req, res) => {
             const mac = rawMac.trim().toLowerCase(); 
             response.mac = mac;
             let oltText = 'ONU tidak ditemukan di OLT manapun';
-            await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { oltText = teksHasil; });
+            try {
+                await scanSemuaOlt(targetServer.olts, mac, async (teksHasil) => { oltText = teksHasil; });
+            } catch (oltErr) {
+                oltText = `Gagal memindai OLT: ${oltErr.message}`;
+            }
             response.olt = oltText;
         }
         return response;
@@ -457,12 +468,10 @@ async function answerTelegramCallback(callbackQueryId, text) {
 }
 
 app.post('/api/telegram-webhook', async (req, res) => {
-    // Telegram harus menerima HTTP 200 secepat mungkin.
     res.status(200).send('OK');
 
     try {
         const update = req.body;
-
         if (!update || !update.callback_query) return;
 
         const callbackQuery = update.callback_query;
@@ -534,22 +543,23 @@ async function jalankanCekRedamanOtomatis(nodeLabel, username, chatId) {
             const mac = rawMac.trim().toLowerCase();
             let hasilRedaman = 'ONU tidak ditemukan di OLT manapun';
 
-            await scanSemuaOlt(
-                connected.targetServer.olts,
-                mac,
-                async (teksHasil) => {
-                    hasilRedaman = teksHasil;
+            try {
+                await scanSemuaOlt(
+                    connected.targetServer.olts,
+                    mac,
+                    async (teksHasil) => {
+                        hasilRedaman = teksHasil;
 
-                    // Hasil boleh dipancarkan ke dashboard segera.
-                    io.emit('realtime_redaman_result', {
-                        username,
-                        redamanText: teksHasil
-                    });
-
-                    // Jika scanSemuaOlt mengembalikan hasil pertama,
-                    // hasil itu langsung menjadi hasil pelanggan.
-                }
-            );
+                        io.emit('realtime_redaman_result', {
+                            username,
+                            redamanText: teksHasil
+                        });
+                    }
+                );
+            } catch (scanErr) {
+                console.error(`⚠️ Error saat proses scan OLT Telegram: ${scanErr.message}`);
+                hasilRedaman = `Gagal memindai OLT: ${scanErr.message}`;
+            }
 
             const hasilMsg =
                 `📊 *HASIL CEK REDAMAN*\n\n` +
