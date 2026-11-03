@@ -1,5 +1,6 @@
-// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync & Telegram Multi-User Webhook)
+// index.js - Server Backend (Express, Socket.io, SNMP Trap, MikroTik Auto-Sync & Telegram Multi-User Permanent)
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const http = require('http');
 const dgram = require('dgram');
@@ -70,17 +71,46 @@ try {
 }
 
 // ==========================================
+// 🔄 SISTEM PENYIMPANAN CHAT ID PERMANEN (JSON)
+// ==========================================
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
+const CHAT_IDS_FILE = path.join(__dirname, 'chatids.json');
+
+function loadSavedChatIds() {
+    try {
+        if (fs.existsSync(CHAT_IDS_FILE)) {
+            const data = fs.readFileSync(CHAT_IDS_FILE, 'utf8');
+            const arr = JSON.parse(data);
+            if (Array.isArray(arr) && arr.length > 0) {
+                return new Set(arr);
+            }
+        }
+    } catch (err) {
+        console.error('⚠️ Gagal memuat chatids.json:', err.message);
+    }
+    // Default fallback jika file belum ada
+    return new Set([TELEGRAM_CHAT_ID]);
+}
+
+function saveChatIdsToDisk() {
+    try {
+        const arr = Array.from(activeChatIds);
+        fs.writeFileSync(CHAT_IDS_FILE, JSON.stringify(arr, null, 2), 'utf8');
+    } catch (err) {
+        console.error('⚠️ Gagal menyimpan chatids.json:', err.message);
+    }
+}
+
+const activeChatIds = loadSavedChatIds();
+
+// ==========================================
 // 🔄 SISTEM CACHE & BACKGROUND SYNC PELANGGAN
 // ==========================================
 let globalCustomerCache = [];
 let isFetchingCache = false;
 let previousCustomerStatus = new Map();
 let isFirstRun = true;
-
-// Daftar penyimpanan chat_id multi-user secara otomatis (menyertakan chat ID utama secara default)
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
-const activeChatIds = new Set([TELEGRAM_CHAT_ID]);
 
 async function updateCustomerCache() {
     if (isFetchingCache) return;
@@ -151,7 +181,7 @@ async function updateCustomerCache() {
                         };
                     }
 
-                    // Kirim broadcast notifikasi ke SEMUA pengguna yang terdaftar di activeChatIds
+                    // Kirim broadcast ke semua chat_id permanen yang tersimpan
                     activeChatIds.forEach(targetChatId => {
                         sendTelegramAlert(msg, replyMarkup, targetChatId);
                     });
@@ -452,7 +482,7 @@ async function sendTelegramAlert(message, replyMarkup = null, chatId = TELEGRAM_
 }
 
 // ==========================================
-// 🤖 TELEGRAM WEBHOOK (SUPPORT MULTI-USER /START & TOMBOL OLT)
+// 🤖 TELEGRAM WEBHOOK (PERMANENT STORAGE MULTI-USER)
 // ==========================================
 async function answerTelegramCallback(callbackQueryId, text) {
     if (!TELEGRAM_BOT_TOKEN) return;
@@ -478,21 +508,23 @@ app.post('/api/telegram-webhook', async (req, res) => {
     try {
         const update = req.body;
 
-        // 1. Tangani pesan teks masuk (seperti perintah /start dari pengguna baru)
+        // 1. Tangani pesan teks masuk (/start)
         if (update && update.message && update.message.text) {
-            const chatId = update.message.chat.id;
+            const chatId = String(update.message.chat.id);
             const text = update.message.text.trim();
 
             console.log(`💬 [TELEGRAM MESSAGE] Pesan dari chat_id ${chatId}: ${text}`);
 
             if (text === '/start') {
-                // Daftarkan otomatis chat_id baru ke daftar broadcast penerima notifikasi
-                activeChatIds.add(String(chatId));
+                if (!activeChatIds.has(chatId)) {
+                    activeChatIds.add(chatId);
+                    saveChatIdsToDisk(); // Simpan permanen ke file JSON
+                }
 
                 await sendTelegramAlert(
                     `👋 *Halo! Selamat datang di RnB Network Bot.*\n\n` +
                     `Bot sistem NMS & MikroTik ini siap membantu Anda memantau status pelanggan dan melakukan pengecekan redaman OLT secara real-time.\n\n` +
-                    `✅ *Status:* Anda telah terdaftar sebagai penerima notifikasi perubahan status pelanggan.`,
+                    `✅ *Status:* Anda telah terdaftar secara permanen sebagai penerima notifikasi.`,
                     null,
                     chatId
                 );
@@ -521,10 +553,13 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
         const nodeLabel = payload.substring(0, firstUnderscore);
         const username = payload.substring(firstUnderscore + 1);
-        const chatId = callbackQuery.message?.chat?.id || TELEGRAM_CHAT_ID;
+        const chatId = String(callbackQuery.message?.chat?.id || TELEGRAM_CHAT_ID);
 
-        // Daftarkan juga chat_id pengklik tombol jika belum ada
-        activeChatIds.add(String(chatId));
+        // Pastikan pengklik tombol juga tercatat secara permanen
+        if (!activeChatIds.has(chatId)) {
+            activeChatIds.add(chatId);
+            saveChatIdsToDisk();
+        }
 
         await answerTelegramCallback(
             callbackQuery.id,
