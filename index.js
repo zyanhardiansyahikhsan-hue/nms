@@ -77,82 +77,10 @@ let isFetchingCache = false;
 let previousCustomerStatus = new Map();
 let isFirstRun = true;
 
-// ==========================================
-// 👥 TELEGRAM MULTI-TEKNISI
-// ==========================================
-// Token WAJIB disimpan di Environment Variable.
-// Jangan menaruh token bot langsung di source code.
-const fs = require('fs');
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
-
-const configuredChatIds = (process.env.TELEGRAM_CHAT_IDS || '')
-    .split(',')
-    .map(id => id.trim())
-    .filter(Boolean);
-
-const TELEGRAM_SUBSCRIBERS_FILE =
-    process.env.TELEGRAM_SUBSCRIBERS_FILE ||
-    path.join(__dirname, 'telegram_subscribers.json');
-
-function loadTelegramSubscribers() {
-    const ids = new Set();
-
-    if (TELEGRAM_CHAT_ID) ids.add(String(TELEGRAM_CHAT_ID));
-    configuredChatIds.forEach(id => ids.add(String(id)));
-
-    try {
-        if (fs.existsSync(TELEGRAM_SUBSCRIBERS_FILE)) {
-            const raw = fs.readFileSync(TELEGRAM_SUBSCRIBERS_FILE, 'utf8');
-            const saved = JSON.parse(raw);
-            if (Array.isArray(saved)) {
-                saved.map(String).filter(Boolean).forEach(id => ids.add(id));
-            }
-        }
-    } catch (err) {
-        console.error('⚠️ Gagal membaca daftar teknisi Telegram:', err.message);
-    }
-
-    return ids;
-}
-
-const activeChatIds = loadTelegramSubscribers();
-
-function saveTelegramSubscribers() {
-    try {
-        fs.writeFileSync(
-            TELEGRAM_SUBSCRIBERS_FILE,
-            JSON.stringify([...activeChatIds], null, 2),
-            'utf8'
-        );
-    } catch (err) {
-        console.error('⚠️ Gagal menyimpan daftar teknisi Telegram:', err.message);
-    }
-}
-
-function addTelegramSubscriber(chatId) {
-    const id = String(chatId);
-    const before = activeChatIds.size;
-    activeChatIds.add(id);
-
-    if (activeChatIds.size !== before) {
-        saveTelegramSubscribers();
-        console.log(`👨‍🔧 [TELEGRAM] Teknisi/chat baru terdaftar: ${id}`);
-    }
-}
-
-function removeTelegramSubscriber(chatId) {
-    const removed = activeChatIds.delete(String(chatId));
-    if (removed) {
-        saveTelegramSubscribers();
-        console.log(`🚫 [TELEGRAM] Chat dihapus dari daftar teknisi: ${chatId}`);
-    }
-}
-
-function getTelegramRecipients() {
-    return [...activeChatIds];
-}
+// Daftar penyimpanan chat_id multi-user secara otomatis (menyertakan chat ID utama secara default)
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8588037946:AAFNGG91vPYphabCGZQ2UUpv2JDeAlcnnN4';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7917320065';
+const activeChatIds = new Set([TELEGRAM_CHAT_ID]);
 
 async function updateCustomerCache() {
     if (isFetchingCache) return;
@@ -222,8 +150,11 @@ async function updateCustomerCache() {
                             ]
                         };
                     }
-                    // Broadcast ke SEMUA teknisi yang sudah terdaftar.
-                    await broadcastTelegramAlert(msg, replyMarkup);
+
+                    // Kirim broadcast notifikasi ke SEMUA pengguna yang terdaftar di activeChatIds
+                    activeChatIds.forEach(targetChatId => {
+                        sendTelegramAlert(msg, replyMarkup, targetChatId);
+                    });
                 }
                 previousCustomerStatus.set(uniqueKey, cust.status);
             });
@@ -482,22 +413,20 @@ app.post('/api/reboot-ont', async (req, res) => {
 // ==========================================
 // 📱 KONFIGURASI TELEGRAM BOT & NOTIFIKASI
 // ==========================================
-async function sendTelegramAlert(message, replyMarkup = null, chatId = null) {
+async function sendTelegramAlert(message, replyMarkup = null, chatId = TELEGRAM_CHAT_ID) {
     if (!TELEGRAM_BOT_TOKEN) {
-        console.error('❌ TELEGRAM_BOT_TOKEN belum di-set di Environment Variables.');
+        console.error('❌ TELEGRAM_BOT_TOKEN belum di-set di Railway Variables.');
         return false;
     }
-
-    const targetChatId = chatId ? String(chatId) : null;
-    if (!targetChatId) {
-        console.error('❌ chat_id Telegram tidak tersedia.');
+    if (!chatId) {
+        console.error('❌ TELEGRAM_CHAT_ID belum di-set di Railway Variables.');
         return false;
     }
 
     try {
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
         const bodyData = {
-            chat_id: targetChatId,
+            chat_id: chatId,
             text: message,
             parse_mode: 'Markdown'
         };
@@ -511,57 +440,15 @@ async function sendTelegramAlert(message, replyMarkup = null, chatId = null) {
         });
 
         const result = await response.json();
-
         if (!result.ok) {
-            console.error(
-                `❌ Telegram sendMessage gagal ke ${targetChatId}:`,
-                result.description
-            );
-
-            if (
-                result.error_code === 400 &&
-                /chat not found|bot was blocked|user is deactivated/i.test(
-                    result.description || ''
-                )
-            ) {
-                removeTelegramSubscriber(targetChatId);
-            }
-
+            console.error('❌ Telegram sendMessage gagal:', result.description);
             return false;
         }
-
         return true;
     } catch (err) {
-        console.error(
-            `❌ Gagal mengirim Telegram alert ke ${targetChatId}:`,
-            err.message
-        );
+        console.error('❌ Gagal mengirim Telegram alert:', err.message);
         return false;
     }
-}
-
-async function broadcastTelegramAlert(message, replyMarkup = null) {
-    const recipients = getTelegramRecipients();
-
-    if (recipients.length === 0) {
-        console.warn(
-            '⚠️ Belum ada teknisi Telegram terdaftar. Minta semua teknisi mengirim /start ke bot.'
-        );
-        return { total: 0, success: 0, failed: 0 };
-    }
-
-    const results = await Promise.all(
-        recipients.map(chatId => sendTelegramAlert(message, replyMarkup, chatId))
-    );
-
-    const success = results.filter(Boolean).length;
-    const failed = results.length - success;
-
-    console.log(
-        `📢 [TELEGRAM BROADCAST] ${success}/${results.length} teknisi menerima notifikasi.`
-    );
-
-    return { total: results.length, success, failed };
 }
 
 // ==========================================
@@ -599,46 +486,19 @@ app.post('/api/telegram-webhook', async (req, res) => {
             console.log(`💬 [TELEGRAM MESSAGE] Pesan dari chat_id ${chatId}: ${text}`);
 
             if (text === '/start') {
-                const wasRegistered = activeChatIds.has(String(chatId));
-                addTelegramSubscriber(chatId);
+                // Daftarkan otomatis chat_id baru ke daftar broadcast penerima notifikasi
+                activeChatIds.add(String(chatId));
 
                 await sendTelegramAlert(
                     `👋 *Halo! Selamat datang di RnB Network Bot.*\n\n` +
-                    `Bot NMS & MikroTik siap membantu memantau status pelanggan dan cek redaman OLT.\n\n` +
-                    `👨‍🔧 *Akses teknisi:* AKTIF\n` +
-                    `📢 *Notifikasi:* Semua notifikasi sistem akan dikirim ke seluruh teknisi yang sudah terdaftar.\n\n` +
-                    (wasRegistered
-                        ? `✅ Anda sudah terdaftar sebagai penerima notifikasi.`
-                        : `✅ Anda berhasil didaftarkan sebagai penerima notifikasi.`),
+                    `Bot sistem NMS & MikroTik ini siap membantu Anda memantau status pelanggan dan melakukan pengecekan redaman OLT secara real-time.\n\n` +
+                    `✅ *Status:* Anda telah terdaftar sebagai penerima notifikasi perubahan status pelanggan.`,
                     null,
                     chatId
                 );
-                return;
             }
-
-            if (text === '/stop') {
-                removeTelegramSubscriber(chatId);
-
-                await sendTelegramAlert(
-                    `🚫 Anda sudah dikeluarkan dari daftar penerima notifikasi.\n\n` +
-                    `Kirim /start kapan saja untuk mendaftar kembali.`,
-                    null,
-                    chatId
-                );
-                return;
-            }
-
-            if (text === '/teknisi') {
-                await sendTelegramAlert(
-                    `👨‍🔧 *STATUS TEKNISI*\n\n` +
-                    `Jumlah penerima notifikasi aktif: *${activeChatIds.size}*\n\n` +
-                    `Kirim /start untuk mendaftar.\n` +
-                    `Kirim /stop untuk berhenti menerima notifikasi.`,
-                    null,
-                    chatId
-                );
-                return;
-            }
+            return;
+        }
 
         // 2. Tangani klik tombol interaktif (Cek Redaman OLT)
         if (!update || !update.callback_query) return;
@@ -664,7 +524,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
         const chatId = callbackQuery.message?.chat?.id || TELEGRAM_CHAT_ID;
 
         // Daftarkan juga chat_id pengklik tombol jika belum ada
-        addTelegramSubscriber(chatId);
+        activeChatIds.add(String(chatId));
 
         await answerTelegramCallback(
             callbackQuery.id,
@@ -739,19 +599,20 @@ async function jalankanCekRedamanOtomatis(nodeLabel, username, chatId) {
                 `📍 *Node:* ${nodeLabel}\n` +
                 `📶 *Hasil:*\n${hasilRedaman}`;
 
-            await broadcastTelegramAlert(hasilMsg, null);
+            await sendTelegramAlert(hasilMsg, null, chatId);
 
             console.log(`✅ [TELEGRAM REDAMAN] ${username} selesai`);
             return { username, server: serverLabel, mac, olt: hasilRedaman };
         } catch (err) {
             console.error(`❌ [TELEGRAM REDAMAN] ${username}:`, err.message);
 
-            await broadcastTelegramAlert(
+            await sendTelegramAlert(
                 `❌ *Gagal cek redaman*\n\n` +
                 `👤 *Nama:* ${username}\n` +
                 `📍 *Node:* ${nodeLabel}\n` +
                 `⚠️ ${err.message}`,
-                null
+                null,
+                chatId
             );
 
             throw err;
@@ -761,20 +622,22 @@ async function jalankanCekRedamanOtomatis(nodeLabel, username, chatId) {
     }, username, serverLabel);
 
     if (queued.position > 1) {
-        await broadcastTelegramAlert(
+        await sendTelegramAlert(
             `⏳ *CEK REDAMAN MASUK ANTREAN*\n\n` +
             `👤 *Nama:* ${username}\n` +
             `📍 *Node:* ${nodeLabel}\n` +
             `🔢 *Posisi:* ${queued.position}\n\n` +
             `Mohon tunggu. Setelah orang sebelumnya selesai, giliran Anda otomatis.`,
-            null
+            null,
+            chatId
         );
     } else {
-        await broadcastTelegramAlert(
+        await sendTelegramAlert(
             `🔎 *CEK REDAMAN DIMULAI*\n\n` +
             `👤 *Nama:* ${username}\n` +
             `📍 *Node:* ${nodeLabel}`,
-            null
+            null,
+            chatId
         );
     }
 
@@ -838,9 +701,6 @@ async function configureTelegramWebhook() {
 }
 
 configureTelegramWebhook();
-
-console.log(`👨‍🔧 [TELEGRAM] ${activeChatIds.size} penerima notifikasi terdaftar saat startup.`);
-console.log('ℹ️ [TELEGRAM] Teknisi baru: buka bot lalu kirim /start.');
 
 process.on('unhandledRejection', err => console.error('❌ UNHANDLED:', err));
 process.on('uncaughtException', err => { if (err.name === 'RosException' && err.message.includes('Timed out')) return; console.error('❌ UNCAUGHT:', err); });
